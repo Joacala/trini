@@ -26,7 +26,7 @@ dim(g)
 #
 ###
 
-# SELECCIÓN  #
+# SELECCI?N  #
 plot(img)
 band <- round(ncol(g)/2)
 abline(v=band)
@@ -49,6 +49,9 @@ res.s <- rings(x, band, ldm, ldms, lum, lums,  alpha, score, join.dis, adaptive,
 end_time <- Sys.time()
 end_time - start_time
 gs <- clever.smooth (x, band, ldm, ldms, lum, lums, alpha)
+
+path <- "C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\data_shiny.csv" 
+visual.cor(res.s,imc, path)
 
 #      PLOT	      # 
 # :::::::::::::::: #
@@ -87,7 +90,7 @@ identify(c,n=1, plot=FALSE,tolerance = 0.5)
 
 
 
-# SELECCIÓN  #
+# SELECCI?N  #
 # :::::::::: #
 
 plot(img)
@@ -136,7 +139,7 @@ dev.off()
 
 
 # :::::::::: #
-# SELECCIÓN  #
+# SELECCI?N  #
 # :::::::::: #
 
 plot(img)
