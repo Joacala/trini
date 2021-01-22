@@ -222,3 +222,128 @@ server <- function(input, output) {
 }
 
 shinyApp(ui, server)
+
+
+
+library(ggplot2)
+library(jpeg)
+library(grid)
+library(shiny)
+
+#### pre-run setup ####
+
+# initiate a ggplot theme for use in plotting
+# (just getting rid of everything so we only see the image itself)
+theme_empty <- theme_bw()
+theme_empty$line <- element_blank()
+theme_empty$rect <- element_blank()
+theme_empty$strip.text <- element_blank()
+theme_empty$axis.text <- element_blank()
+theme_empty$plot.title <- element_blank()
+theme_empty$axis.title <- element_blank()
+
+# set the image input file
+image.file <- "C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\jaime_pino.png"
+
+img <- load.image(image.file)
+
+#load.image("C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\jaime_pino.png")
+## set up a function for loading an image file as a grob ---------------------
+# grob_image <- function(file) {
+#   grid::rasterGrob( jpeg::readJPEG(file), interpolate = TRUE )
+# }
+
+## load the image as a a grob ---------------------
+# img <- grob_image(image.file)
+
+#### UI ####
+ui <- fluidPage(
+  
+  # Overlapping images in 2 divs inside a "container"
+  fluidRow(
+    div(id="container",
+        height = dim(img)[1],
+        width = dim(img)[2],
+        actionButton("reset", "Reset"),
+        actionButton("save", "Save"),
+        style="position:relative;",
+        div(tags$img(src="C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\jaime_pino.png",
+                     style=paste0("width:",dim(img)[2],";height:",dim(img)[1],";")),
+             style="position:absolute; top:0; left:0;"),
+        div(plotOutput("plot1", 
+                       height = dim(imc)[2],
+                       width = dim(imc)[1],
+                       dblclick = dblclickOpts(id = "plot_click2"),
+                       click = "plot_click"),
+            style="position:absolute; top:0; left:0;")
+    )
+  )
+)
+
+
+
+
+### SERVER ####
+server <- function(input, output, session) {
+  
+  ## get clicked point coordinates -----------------------
+  xy_coord <- reactive(c(input$image_click$x,input$image_click$y))
+  
+  ## add the new points to the dataframe -----------------
+  xy_clicks <- shinySignals::reducePast(xy_coord,
+                                        function(x,y){
+                                          df <- x
+                                          nn <- nrow(df)
+                                          
+                                          # add values in case of click
+                                          if(length(y)>0){
+                                            df[nn+1,1 ] <- y[1]
+                                            df[nn+1,2 ] <- y[2]
+                                          }
+                                          return(df)
+                                        },
+                                        init=data.frame(x_coord=numeric(0),
+                                                        y_coord=numeric(0)))
+  
+  ## render plot of the jpeg image --------------------------------------
+  # output$plot <- renderPlot({
+  #   ggplot()+
+  #     geom_blank(data = data.frame(x = c(0, dim(img$raster)[2])
+  #                                  , y = c(0, dim(img$raster)[1])),
+  #                mapping = aes(x = x, y = y))+
+  #     theme_empty +
+  #     annotation_custom(grob = img)
+  # })
+  
+  # alternative for plot of the jpeg image
+  # output$plot <- renderPlot({
+  #   # plot_jpeg("survey.jpg")
+  # })
+  
+  
+  ## re-render the plot with the new data -------------------------
+  output$plot1 <- renderPlot({
+    ggplot() +
+      geom_blank(data = data.frame(x = c(0,dim(img)[2])
+                                   ,y = c(0,dim(img)[1])),
+                 mapping = aes(x = x,
+                               y = y))+
+      theme_empty+
+      geom_point(data = xy_clicks(),
+                 mapping = aes(x = x_coord,
+                               y = y_coord),
+                 colour = "red")+
+      coord_cartesian(xlim = c(0,dim(img)[2]),
+                      ylim= c(0,dim(img)[1]))
+    
+  },
+  bg="transparent")
+  
+}
+
+
+## uncomment and add verbatimTextOutput("txt") in UI to see the xy_clicks() dataframe
+# output$txt <- renderPrint(xy_clicks())
+
+# Run the application 
+shinyApp(ui = ui, server = server)
