@@ -50,8 +50,11 @@ end_time <- Sys.time()
 end_time - start_time
 gs <- clever.smooth (x, band, ldm, ldms, lum, lums, alpha)
 
+
 path <- "C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\data_shiny.csv" 
-visual.cor(res.s,imc, path)
+visual.cor(res.s,imc,-10, path)
+
+
 
 #      PLOT	      # 
 # :::::::::::::::: #
