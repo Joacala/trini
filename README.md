@@ -1,2 +1,2 @@
 # shiny_dendro
-Puto becario me hace sufrir
+Here we're going to create a shiny app that counts, crossdates, and gets many other variables from tree cores
