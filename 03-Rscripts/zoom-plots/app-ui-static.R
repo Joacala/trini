@@ -1,7 +1,7 @@
 #imc <- load.image("03-Rscripts/zoom-plots/www/Pinu_gorria_02_Asier.png")
 
 library(shiny)
-
+library(imager)
 ui <- fluidPage(
   
   # Overlapping images in 2 divs inside a "container"
