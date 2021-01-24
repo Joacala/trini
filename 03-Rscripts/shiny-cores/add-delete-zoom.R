@@ -1,12 +1,14 @@
 library(imager)
 library(shiny)
-rsize.per <- -10
+#library(shinyKnobs)
+library(keys)
+
 
 visual.cor <- function(res.s,imc, rsize.per, path ){
  
   im <- resize(imc, rsize.per, rsize.per) # x = width; y =heigh
   ui <- fluidPage(
-    
+    useKeys(),
     fluidRow(
       column(6,
       div(id="container",
@@ -39,6 +41,9 @@ visual.cor <- function(res.s,imc, rsize.per, path ){
     )
   
   server <- function(input, output) {
+    
+    addKeys("down", "down")
+    addKeys("up", "up")
     
     ### function for plotting the dynamic image
     app.plot.img <- function(imc){
@@ -107,7 +112,29 @@ visual.cor <- function(res.s,imc, rsize.per, path ){
         ranges$y <- c(input$plot1_brush$ymin * abs(rsize.per), input$plot1_brush$ymax * abs(rsize.per))
     })
     
+    observeEvent(input$up,{
+      if(is.null(ranges$y)){
+      }else{
+        ran <- (ranges$y[2]-ranges$y[1])
+        ranges$y[1] <- ranges$y[1]-ran -(ran*0.1)
+        ranges$y[2] <- ranges$y[2]-ran -(ran*0.1)
+        
+      }
+    })
+    
+    observeEvent(input$down,{
+      if(is.null(ranges$y)){
+      }else{
+        ran <- (ranges$y[2]-ranges$y[1])
+        ranges$y[1] <- ranges$y[1]+ran -(ran*0.1)
+        ranges$y[2] <- ranges$y[2]+ran -(ran*0.1)
+      }
+    })
+    
   }
+  
+
+  
   
   
   shinyApp(ui, server)
@@ -115,6 +142,8 @@ visual.cor <- function(res.s,imc, rsize.per, path ){
 }
 
 
+rsize.per <- -10
+path <- "C:/Users/F541U/Desktop/proyectos/Julen/kk.csv"
 visual.cor(res.s,imc, rsize.per, path)
 
 
