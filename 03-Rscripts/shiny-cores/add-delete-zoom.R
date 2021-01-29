@@ -3,7 +3,8 @@ library(shiny)
 #library(shinyKnobs)
 library(keys)
 
-
+im <- resize(imc, -40, -40)
+res <- res.s*0.4
 visual.cor <- function(res.s,imc, rsize.per, path ){
  
   im <- resize(imc, rsize.per, rsize.per) # x = width; y =heigh
@@ -44,6 +45,8 @@ visual.cor <- function(res.s,imc, rsize.per, path ){
     
     addKeys("down", "down")
     addKeys("up", "up")
+    addKeys("left", "left")
+    addKeys("right", "right")
     
     ### function for plotting the dynamic image
     app.plot.img <- function(imc){
@@ -131,6 +134,33 @@ visual.cor <- function(res.s,imc, rsize.per, path ){
       }
     })
     
+    observeEvent(input$left,{
+      if(is.null(ranges$y)){
+      }else{
+        ran <- (ranges$y[2]-ranges$y[1])
+        ranges$y[1] <- ranges$y[1]+ran -(ran*0.1)
+        ranges$y[2] <- ranges$y[2]-ran + (ran*-0.1)
+        
+        ranx <- (ranges$x[2]-ranges$x[1])
+        ranges$x[1] <- ranges$x[1]+ranx -(ranx*0.1)
+        ranges$x[2] <- ranges$x[2]-ranx -(ranx*0.1)
+        
+      }
+    })
+    
+    observeEvent(input$right,{
+      if(is.null(ranges$y) | is.null(ranges$x)){
+      }else{
+        ran <- (ranges$y[2]-ranges$y[1])
+        ranges$y[1] <- ranges$y[1]-ran -(ran*0.1)
+        ranges$y[2] <- ranges$y[2]+ran -(ran*0.1)
+        
+        ranx <- (ranges$x[2]-ranges$x[1])
+        ranges$x[1] <- ranges$x[1]-ranx -(ranx*0.1)
+        ranges$x[2] <- ranges$x[2]+ranx -(ranx*0.1)
+      }
+    })
+    
   }
   
 
@@ -143,8 +173,9 @@ visual.cor <- function(res.s,imc, rsize.per, path ){
 
 
 rsize.per <- -10
+ 
 path <- "C:/Users/F541U/Desktop/proyectos/Julen/kk.csv"
-visual.cor(res.s,imc, rsize.per, path)
+visual.cor(res,im, rsize.per, path)
 
 
 
