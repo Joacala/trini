@@ -33,6 +33,7 @@ visual.cor <- function(res.s,imc, rsize.per, path ){
                      width = 400,
                          brush = brushOpts(
                            id = "plot1_brush",
+                           fill="",
                            resetOnNew = FALSE)),
       actionButton("reset", "Reset"),
       actionButton("save", "Save"),
@@ -90,8 +91,9 @@ visual.cor <- function(res.s,imc, rsize.per, path ){
     })
     
     output$plot3 <- renderPlot({
-      plot(im,xlim=c(dim(im)[2]/2*-1,dim(im)[2]/2),ylim=c(dim(im)[2],0),asp="varying",Axes=F)
-    })
+      plot(im,xlim=c(dim(im)[2]/2*-1,dim(im)[2]/2),ylim=c(dim(im)[2],0),asp="varying")
+      rect(ranges$x[1]/abs(rsize.per), ranges$y[2]/abs(rsize.per), ranges$x[2]/abs(rsize.per), ranges$y[1]/abs(rsize.per))
+       })
     
     observeEvent(input$plot_click2, {
       np <- nearPoints(rv$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
@@ -119,8 +121,8 @@ visual.cor <- function(res.s,imc, rsize.per, path ){
       if(is.null(ranges$y)){
       }else{
         ran <- (ranges$y[2]-ranges$y[1])
-        ranges$y[1] <- ranges$y[1]-ran -(ran*0.1)
-        ranges$y[2] <- ranges$y[2]-ran -(ran*0.1)
+        ranges$y[1] <- ranges$y[1]-ran +(ran*0.1)
+        ranges$y[2] <- ranges$y[2]-ran +(ran*0.1)
         
       }
     })
@@ -138,32 +140,35 @@ visual.cor <- function(res.s,imc, rsize.per, path ){
       if(is.null(ranges$y)){
       }else{
         ran <- (ranges$y[2]-ranges$y[1])
-        ranges$y[1] <- ranges$y[1]+ran -(ran*0.1)
-        ranges$y[2] <- ranges$y[2]-ran + (ran*-0.1)
+        ranges$y[1] <- ranges$y[1] + abs(ranges$y[1]*0.1) 
+        ranges$y[2] <- ranges$y[2] - abs(ranges$y[2]*0.1)
         
         ranx <- (ranges$x[2]-ranges$x[1])
-        ranges$x[1] <- ranges$x[1]+ranx -(ranx*0.1)
-        ranges$x[2] <- ranges$x[2]-ranx -(ranx*0.1)
+        ranges$x[1] <- ranges$x[1]+ abs(ranges$x[1]*0.1)
+        ranges$x[2] <- ranges$x[2]- abs(ranges$x[2]*0.1)
         
       }
     })
     
     observeEvent(input$right,{
-      if(is.null(ranges$y) | is.null(ranges$x)){
+      if(is.null(ranges$y)){
       }else{
         ran <- (ranges$y[2]-ranges$y[1])
-        ranges$y[1] <- ranges$y[1]-ran -(ran*0.1)
-        ranges$y[2] <- ranges$y[2]+ran -(ran*0.1)
+        ranges$y[1] <- ranges$y[1] - abs(ranges$y[1]*0.1) 
+        ranges$y[2] <- ranges$y[2] + abs(ranges$y[2]*0.1)
         
         ranx <- (ranges$x[2]-ranges$x[1])
-        ranges$x[1] <- ranges$x[1]-ranx -(ranx*0.1)
-        ranges$x[2] <- ranges$x[2]+ranx -(ranx*0.1)
+        ranges$x[1] <- ranges$x[1]- abs(ranges$x[1]*0.1)
+        ranges$x[2] <- ranges$x[2]+ abs(ranges$x[2]*0.1)
+        
       }
     })
+    
     
   }
   
 
+  1/1.5
   
   
   
