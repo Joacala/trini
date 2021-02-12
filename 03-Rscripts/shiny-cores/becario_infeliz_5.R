@@ -50,6 +50,14 @@ end_time <- Sys.time()
 end_time - start_time
 gs <- clever.smooth (x, band, ldm, ldms, lum, lums, alpha)
 
+dim(imc)
+247/4
+
+gs <- gs[[1]]
+max(gs)
+
+gst <- (gs*(dim(imc)[1]/4))/max(gs)
+
 
 path <- "C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\data_shiny.csv" 
 visual.cor(res.s,imc,-10, path)
@@ -60,18 +68,18 @@ visual.cor(res.s,imc,-10, path)
 # :::::::::::::::: #
 
 path <- "C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\resultados\\"
-name <- "incana_procesado.PDF"
+name <- "incana_procesado_1.PDF"
 par <- paste("ldm_",ldm,"-lum_",lum,"-lums_",lums,"-ldms_",ldms,"-alpha_",alpha,"-adaptive_",adaptive,"-score_",score,"-join.dis_",join.dis,"_",sep="")
 
-
+dev.off()
 pdf(paste(path,par,name,sep=""))
-plot(imc,ylim=c(1000,0))
+plot(imc)
 points(res.s[,2]~res.s[,1],col=4,pch="_",cex=0.05)
 for(i in 1:(nrow(res.s)-1)){
 	segments(res.s[i,1], res.s[i,2], res.s[i+1,1], res.s[i+1,2],col=4,lwd=0.1,lty=3)
 	text(res.s[i,1]+4,(res.s[i,3])/2+res.s[i,2],round(res.s[i,3],2),cex=0.1)
 }
-lines(gs[[1]], 1:length(gs[[1]]),lwd=0.1,col=2)
+lines(gst, 1:length(gst),lwd=0.1,col=2)
 abline(h=res.s[,2],lwd=0.01,lty=2)
 abline(v=score*ncol(g),lwd=0.05,lty=1)
 dev.off()
