@@ -11,6 +11,7 @@ imc <- load.image("C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\jaime_pino.png")
 img <- imc
 img <- flatten.alpha(img, bg = "white")
 
+
 #img <- imgradient(img,"y")
 # por explorar
 
@@ -48,12 +49,12 @@ start_time <- Sys.time()
 res.s <- rings(x, band, ldm, ldms, lum, lums,  alpha, score, join.dis, adaptive,late,distance)
 end_time <- Sys.time()
 end_time - start_time
-gs <- clever.smooth (x, band, ldm, ldms, lum, lums, alpha)
+gs <- clever.smooth (x, c(40,50), ldm, ldms, lum, lums, alpha)
 
 dim(imc)
 247/4
 
-gs <- gs[[1]]
+length( gs[[1]])
 max(gs)
 
 gst <- (gs*(dim(imc)[1]/4))/max(gs)
@@ -157,10 +158,10 @@ plot(img)
 band <- 21# round(ncol(g)/2)
 band.end <- ncol(g)-21
 Nband <- 15
-even =T
+even =F
 abline(v=band)
 abline(v=band.end)
-cor.threshold <- 0.5
+cor.threshold <- 0.8
 sel <- band.sel (g, band, cor.threshold,even,band.end,Nband) 
 
 # ::::::::::::::: #

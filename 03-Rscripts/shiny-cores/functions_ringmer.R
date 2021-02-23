@@ -29,7 +29,6 @@ clever.smooth <- function(x, sel, ldm, ldms, lum, lums,  alpha){
 #lum : ## Heigh upper mean
 #lums : ## width upper mean
 #alpha : ## gaussian decay exponent (0 = no decay; 0> increase decay); plot(gaus_decay_w(1:100,alpha))
-#theta : ## parameter to wieght dark colours
 
 res <- list()
 x[x==0] <- 1e-10
@@ -64,7 +63,7 @@ x[x==0] <- 1e-10
 		res [[length(res)+1]] <- diff
 	}
 	names(res) <- sel
-	res
+	do.call(cbind,res)
 }
 
 ###################################################################################################################
@@ -119,20 +118,10 @@ peaks <- function(x, score, join.dis, adaptive, late){
 # threshold : correlation threshold
 # even: if T, select Nband evenly distributed between band and band.N
 
-band.sel <- function(x, band,threshold,even=F, band.end=NA, Nband=NA){
+band.sel <- function(x, band, band.end=NA, Nband=NA){
 
-	if(!even){
-		cor.center <- c()
-		for(i in 1:ncol(g)){
-			cor.center[i]<- cor(g[,i],g[,band])
-		}
-		sel <- which(cor.center>=threshold)
-		sel <- sel[order(abs(sel-band))]
-	}
-	if(even){
 		sel <- round(seq(band,band.end,length=Nband))
-	}
-	sel
+
 }
 
 

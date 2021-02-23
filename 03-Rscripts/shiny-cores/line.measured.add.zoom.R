@@ -5,12 +5,15 @@ library(shiny)
 library(keys)
 
 
-line.measured <- function(res.s,imc,rsize.per, gs){
+line.measured <- function(imc,rsize.per){
+require(imager)
   
   im <- resize(imc, rsize.per, rsize.per) # x = width; y =heigh
-  gst <- (gs*(dim(imc)[1]/2))/max(gs)
-  
-  
+  imc <- flatten.alpha(imc, bg = "white")# solo para png4
+  x <- grayscale(imc, method = "Luma", drop = TRUE)
+  x <- t(channels(x, drop = T)[[1]])
+  slider.size <- (min(x)-max(x))*(dim(imc)[1]/2/max(x))
+
   
   ui <- fluidPage(
     useKeys(),
@@ -55,9 +58,74 @@ line.measured <- function(res.s,imc,rsize.per, gs){
                            actionButton("undo", "Undo"),
                            textInput("file_l", "File name", value = "lines.csv"),
                            actionButton("save_l", "Save")),
-                  tabPanel("Peak score",value="score.p",
-                           sliderInput("score","", min = round(min(gst),2), max = 0, round=-2,step=0.01,
-                                       value = 0)),
+                  tabPanel("Smoothing",value="smooth",
+                           radioButtons(
+                             inputId = "line_type",
+                             label = "Target lines",
+                             choices = list("Interactive" = "int",
+                                            "Single" = "sin",
+                                            "Multi" = "mul")),
+                           numericInput(inputId = "band_x1", 
+                                        label = "Initial band", 
+                                        value = round(dim(imc)[1]/2),
+                                        min = 0, 
+                                        max = dim(imc)[1], 
+                                        step = 1),
+                           numericInput(inputId = "band_xn", 
+                                        label = "Final band", 
+                                        value = round(dim(imc)[1]/2),
+                                        min = 0, 
+                                        max = dim(imc)[1],
+                                        step = 1),
+                           numericInput(inputId = "band_N", 
+                                        label = "N bands", 
+                                        value = 1,
+                                        min = 1, 
+                                        max = dim(imc)[1],
+                                        step = 1),
+                           numericInput(inputId = "hdm", 
+                                        label = "Heigh down", 
+                                        value = 1,
+                                        min = 0, 
+                                        max = dim(imc)[2], 
+                                        step = 1),
+                           numericInput(inputId = "wdm", 
+                                        label = "Width down", 
+                                        value = 1,
+                                        min = 0, 
+                                        max = dim(imc)[1], 
+                                        step = 1),
+                           numericInput(inputId = "hum", 
+                                        label = "Heigh up", 
+                                        value = 1,
+                                        min = 0, 
+                                        max = dim(imc)[2], 
+                                        step = 1),
+                           numericInput(inputId = "wum", 
+                                        label = "Width up", 
+                                        value = 1,
+                                        min = 0, 
+                                        max = dim(imc)[1], 
+                                        step = 1),
+                           numericInput(inputId = "alpha", 
+                                        label = "D weight", 
+                                        value = 0,
+                                        min = 0, 
+                                        max = 100, 
+                                        step = 1),
+                           actionButton("run_smooth", "Run"),
+                           actionButton("save_smooth", "Save"),
+                           actionButton("reset_smooth", "Reset")),
+                  tabPanel("Ring detection",value="score.p",
+                           sliderInput("score","Score", min = round(slider.size,2), max = 0, round=-2,step=0.01,
+                                       value = 0),
+                           numericInput(inputId = "join", 
+                                        label = "Merge", 
+                                        value = 1,
+                                        min = 1, 
+                                        max = dim(imc)[2], 
+                                        step = 1),
+                           actionButton("run_peak_single", "Run single")),
                   tabPanel("Correction", value="corr",
                            actionButton("rese", "Reset"),
                            textInput("file_p", "File name", value = "points.csv"),
@@ -70,8 +138,7 @@ line.measured <- function(res.s,imc,rsize.per, gs){
       )
     )
 
-  
-  
+
   server <- function(input, output) {
     
     addKeys("down", "down")
@@ -80,7 +147,9 @@ line.measured <- function(res.s,imc,rsize.per, gs){
     addKeys("right", "right")
     addKeys("undok","ctrl+z")
     
-    ### function for plotting the dynamic image
+
+# functions ---------------------------------------------------------------
+
     app.plot.img <- function(imc){
       if(is.null(imc)){
         return(NULL)
@@ -88,11 +157,11 @@ line.measured <- function(res.s,imc,rsize.per, gs){
       if(is.null(ranges$x) | is.null(ranges$y)){
         plot(imc ,xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),asp="varying")
       }else{
-        plot(imc, xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),asp="varying") # ylim: importante para que no le de la vuelta a la imagen al hacer zoom
+        plot(imc, xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),asp="varying")
       }
     }
-    
     app.plot.sct <- function(rv){
+      # OJO: simplificar codigo repetido
       if(input$tabs=="line"){
        if(is.null(ranges$x) ){
         par(bg="transparent")
@@ -135,27 +204,128 @@ line.measured <- function(res.s,imc,rsize.per, gs){
         }
         if(is.null(ranges$x) | is.null(ranges$y)){
           par(bg="transparent")
-          plot(r$m$y~r$m$x,col=4,pch="",cex=1.5,
+          if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,1]*(dim(imc)[1]/2))/max(smooth$res)}
+          if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
+               plot(yp~xp,col=4,pch=3,cex=1.5,
                yaxs="i", xaxs="i",
                xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
               lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
               abline(v=input$score)
         }else{
           par(bg="transparent")
-          plot(r$m$y~r$m$x,col=4,pch="",cex=1.5,
+          if(is.null(smooth$res)){gst=0} else{gst <- (smooth$res[,1]*(dim(imc)[1]/2))/max(smooth$res)}
+          if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
+               plot(yp~xp,col=4,pch=3,cex=1.5,
                yaxs="i", xaxs="i",
                xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") # ylim: importante para que no le de la vuelta a la imagen al hacer zoom
                lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
                abline(v=input$score)
         }
       }
+      if(input$tabs=="smooth"){
+        if(is.null(r)){
+          return(NULL)
+        }
+        if(is.null(ranges$x) | is.null(ranges$y)){
+          par(bg="transparent")
+          if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,1]*(dim(imc)[1]/2))/max(smooth$res[,1])}
+          if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
+          plot(yp~xp,col=4,pch="",cex=1.5,
+               yaxs="i", xaxs="i",
+               xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
+          lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
+        }else{
+          par(bg="transparent")
+          if(is.null(smooth$res)){gst=0} else{gst <- (smooth$res[,1]*(dim(imc)[1]/2))/max(smooth$res[,1])}
+          if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
+          plot(yp~xp,col=4,pch="",cex=1.5,
+               yaxs="i", xaxs="i",
+               xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") # ylim: importante para que no le de la vuelta a la imagen al hacer zoom
+          lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
+        }
+      }
     }
-    
-    
-    rv=reactiveValues(m=data.frame(x1=NA,y1=NA,x2=NA,y2=NA))
-    r=reactiveValues(m=data.frame(x=res.s$x,y=res.s$y))
-    sf=reactiveValues(r=c(0))
+    band.sel <- function(band, band.end=NA, Nband=NA){
+      # OJO: si band.end - band < Nband. Dar aviso
+      sel <- round(seq(band,band.end,length=Nband))
+      
+    }
+    clever.smooth <- function(x, sel, ldm, ldms, lum, lums,  alpha){
+      
+      #x : ## matrix
+      #sel : ## selected bands
+      #ldm : ## Heigh dwon mean
+      #ldms : ## width dwon mean
+      #lum : ## Heigh upper mean
+      #lums : ## width upper mean
+      #alpha : ## gaussian decay exponent (0 = no decay; 0> increase decay); plot(gaus_decay_w(1:100,alpha))
+      
+      res <- list()
+      x[x==0] <- 1e-10
+      for(i in sel){
+        #horizontal margins
+        #if(i<(ldms+1)){ldms <- ldms+(i-(ldms+1))}
+        #if(ncol(x)< i+(ldms+1)){ldms <- ldms+(ncol(x)-(ldms+1))}
+        #if(i-(lums+1)<0){lums <- lums+(i-(lums+1))}
+        #if(ncol(x)< i+(lums+1)){lums <- lums+(ncol(x)-(lums+1))}
+        
+        #vertical margins
+        y0 <- (lum+1)
+        yf <- (nrow(x)-(ldm+1))
+        
+        #gaussian weighs
+        th <- abs(0:(lums*2)-lums)
+        tv <- 0:lum
+        dis.up <- decay.gaus.2d(alpha, th, tv)
+        
+        th <- abs(0:(ldms*2)-ldms)
+        tv <- 0:ldm
+        dis.dwon <- decay.gaus.2d(alpha, th, tv)
+        
+        diff <- c()
+        diff[1:y0] <- 0
+        for(j in y0:yf){
+          upper.mean <- sum(x[(j-lum):j,(i-lums):(i+lums)]*dis.up)/sum(dis.up)
+          down.mean <- sum(x[j:(j+ldm),(i-ldms):(i+ldms)]*dis.dwon)/sum(dis.dwon)
+          diff[j] <- ((down.mean-upper.mean)/upper.mean)#+ down.mean*theta
+        }
+        diff[(j+1):nrow(x)] <- 0
+        res [[length(res)+1]] <- diff
+      }
+      names(res) <- sel
+      do.call(cbind,res)
+    }
+    peaks <- function(x, score, join.dis){
+      
+      #x : vector where peaks are detected
+      #score: thershold to detect a peak
+      #join.dis: merge consecutive peaks at a <join.dis pixels
+      #late: if late=T, measure late wood
+      
+      res <- which(x<=score)
+      v <- c()
+      for(i in 1:length(res)){
+        x0 <- res[i]-join.dis; if(x0<1){x0=1}
+        xf <- res[i]+join.dis; if(xf>length(x)){xf=length(x)}
+        if(sum(x[x0:xf]<x[res[i]],na.rm=T)>0){v[length(v)+1] <- i}
+      }			
+      res <- res[-v]
+    }
+
+# reactive ----------------------------------------------------------------
+ 
+    rv = reactiveValues(m=data.frame(x1=NA,y1=NA,x2=NA,y2=NA))
+    r = reactiveValues(m=NULL)
+    sf = reactiveValues(r=c(0))
+    sel = reactiveValues(sel=c(NA))
     ranges <- reactiveValues(x = NULL, y = NULL)
+    smooth = reactiveValues(res = NULL)
+    peak = reactiveValues(res = NULL)
+    
+
+
+    
+# plots -------------------------------------------------------------------
     
     output$plot1 <- renderPlot({
       app.plot.sct(rv)
@@ -171,6 +341,9 @@ line.measured <- function(res.s,imc,rsize.per, gs){
     })
     
     
+
+# observe events ----------------------------------------------------------
+
     observeEvent(input$plot1_brush, {
       ranges$x <- c(input$plot1_brush$xmin * abs(rsize.per), input$plot1_brush$xmax * abs(rsize.per))
       ranges$y <- c(input$plot1_brush$ymin * abs(rsize.per), input$plot1_brush$ymax * abs(rsize.per))
@@ -240,8 +413,10 @@ line.measured <- function(res.s,imc,rsize.per, gs){
     })
     dim(imc)
     observeEvent(input$plot_click2, {
-      np <- nearPoints(r$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
-      r$m <- r$m[!np$selected_,]
+      if(input$tabs=="corr"){
+        np <- nearPoints(r$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
+        r$m <- r$m[!np$selected_,]
+      }
     })
     
     observeEvent(input$undo, {
@@ -284,17 +459,33 @@ line.measured <- function(res.s,imc,rsize.per, gs){
       write.csv(r$m,input$file_p)
     })
     
+    observeEvent(input$run_smooth,{  
+      if(input$line_type == "int"){sel$sel <- input$band_x1}
+      if(input$line_type == "sin"){sel$sel <- input$band_x1}
+      if(input$line_type == "mul"){
+        sel$sel <- band.sel(input$band_x1,input$band_xn,input$band_N)
+      }
+      smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$wdm, input$hum, input$wum,  input$alpha)
+      }
+    )
+    
+    observeEvent(input$run_peak_single,{  
+      smooth_res <- smooth$res*(dim(imc)[1]/2/max(smooth$res))
+      peak_res <- peaks(smooth_res[,1],input$score,input$join)
+      r$m <- data.frame(x=input$band_x1, y=peak_res)
+     }
+    )
+    
   }
-  
 
-  
   shinyApp(ui, server)
   
 }
 
+
 path <- "C:/Users/F541U/Desktop/proyectos/Julen/"
 rsize.per <- -10
-line.measured(res.s, imc,rsize.per, gs)
+line.measured(imc,rsize.per)
 
 
 getwd()
