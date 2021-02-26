@@ -51,18 +51,47 @@ end_time <- Sys.time()
 end_time - start_time
 gs <- clever.smooth (x, c(40,50), ldm, ldms, lum, lums, alpha)
 
-dim(imc)
-247/4
 
-length( gs[[1]])
-max(gs)
+x <- gs[[1]]
+class(x)
+peaks <- function(x, score, join.dis, adaptive, late){
+  
+  if(!adaptive){
+    res <- which(x<=score)
+    v <- c()
+    for(i in 1:length(res)){
+      x0 <- res[i]-join.dis; if(x0<1){x0=1}
+      xf <- res[i]+join.dis; if(xf>length(x)){xf=length(x)}
+      if(sum(x[x0:xf]<x[res[i]],na.rm=T)>0){v[length(v)+1] <- i}
+    }			
+    res <- res[-v]
+  }else{
+    res <- which(x < 0)
+    v <- c()
+    for(i in 1:length(res)){
+      x0 <- res[i]-join.dis; if(x0<1){x0=1}
+      xf <- res[i]+join.dis; if(xf>length(x)){xf=length(x)}
+      if(x[res[i]]<=quantile(x[x0:xf],score)){v[length(v)+1] <- i}
+    }
+    res <- res[v]
+  }
+  
+  if(late){
+    res.end <- c()
+    for(i in 1:(length(res)-1)){
+      res.end[i] <- c(res[i]:res[i+1])[which.max(x[res[i]:res[i+1]])]
+    }
+    res.end[length(res)] <- which.max(x[res[length(res)]]:x[length(x)])+res[length(res)]-1
+    res <- data.frame(ini = res, end= res.end)
+  }
+  res
+  
+}
 
-gst <- (gs*(dim(imc)[1]/4))/max(gs)
 
 
 path <- "C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\data_shiny.csv" 
 visual.cor(res.s,imc,-10, path)
-
 
 
 #      PLOT	      # 

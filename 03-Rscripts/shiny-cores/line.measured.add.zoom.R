@@ -55,9 +55,7 @@ require(imager)
       tabsetPanel(id="tabs",
                   
                   tabPanel("Line measured",value="line",
-                           actionButton("undo", "Undo"),
-                           textInput("file_l", "File name", value = "lines.csv"),
-                           actionButton("save_l", "Save")),
+                           actionButton("undo", "Undo")),
                   tabPanel("Smoothing",value="smooth",
                            radioButtons(
                              inputId = "line_type",
@@ -85,25 +83,25 @@ require(imager)
                                         step = 1),
                            numericInput(inputId = "hdm", 
                                         label = "Heigh down", 
-                                        value = 1,
+                                        value = 10,
                                         min = 0, 
                                         max = dim(imc)[2], 
                                         step = 1),
                            numericInput(inputId = "wdm", 
                                         label = "Width down", 
-                                        value = 1,
+                                        value = 10,
                                         min = 0, 
                                         max = dim(imc)[1], 
                                         step = 1),
                            numericInput(inputId = "hum", 
                                         label = "Heigh up", 
-                                        value = 1,
+                                        value = 10,
                                         min = 0, 
                                         max = dim(imc)[2], 
                                         step = 1),
                            numericInput(inputId = "wum", 
                                         label = "Width up", 
-                                        value = 1,
+                                        value = 10,
                                         min = 0, 
                                         max = dim(imc)[1], 
                                         step = 1),
@@ -113,15 +111,13 @@ require(imager)
                                         min = 0, 
                                         max = 100, 
                                         step = 1),
-                           actionButton("run_smooth", "Run"),
-                           actionButton("save_smooth", "Save"),
-                           actionButton("reset_smooth", "Reset")),
+                           actionButton("run_smooth", "Run")),
                   tabPanel("Ring detection",value="score.p",
                            sliderInput("score","Score", min = round(slider.size,2), max = 0, round=-2,step=0.01,
-                                       value = 0),
+                                       value = slider.size/2),
                            numericInput(inputId = "join", 
                                         label = "Merge", 
-                                        value = 1,
+                                        value = 10,
                                         min = 1, 
                                         max = dim(imc)[2], 
                                         step = 1),
@@ -129,10 +125,17 @@ require(imager)
                   tabPanel("Correction", value="corr",
                            actionButton("rese", "Reset"),
                            textInput("file_p", "File name", value = "points.csv"),
-                           actionButton("save_p", "Save")
-                           
-                  )
-
+                           actionButton("save_p", "Save")),
+                  tabPanel("Late wood", value="late",
+                           actionButton("run_late", "Run"),
+                           actionButton("rese_late", "Reset"),
+                           textInput("file_late", "File name", value = "late.csv"),
+                           actionButton("save_late", "Save")),
+                  tabPanel("Measures", value="measure",
+                           textInput("file_dis_ring", "Compute and save distances between rings", value = "distance_ring.csv"),
+                           actionButton("dis_ring", "Run & save"),
+                           textInput("file_dis_late", "Compute and save distances between ring parts", value = "distance_parts.csv"),
+                           actionButton("dis_late", "Run & save"))
           )
       )
       )
@@ -145,13 +148,15 @@ require(imager)
     addKeys("up", "up")
     addKeys("left", "left")
     addKeys("right", "right")
-    addKeys("undok","ctrl+z")
+    addKeys("ctrl", "ctrl")
+    addKeys("shift", "shift")
+    addKeys("undo_key","ctrl+z")
     
 
 # functions ---------------------------------------------------------------
 
     app.plot.img <- function(imc){
-      if(is.null(imc)){
+       if(is.null(imc)){
         return(NULL)
       }
       if(is.null(ranges$x) | is.null(ranges$y)){
@@ -160,6 +165,7 @@ require(imager)
         plot(imc, xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),asp="varying")
       }
     }
+  
     app.plot.sct <- function(rv){
       # OJO: simplificar codigo repetido
       if(input$tabs=="line"){
@@ -244,6 +250,24 @@ require(imager)
           lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
         }
       }
+      if(input$tabs=="late"){ # OJO: cuando se quite un punto late y no haya correspondecia poner un punto
+        if(is.null(r)){
+          return(NULL)
+        }
+        if(is.null(ranges$x) | is.null(ranges$y)){
+          par(bg="transparent")
+          plot(r$m$y~r$m$x,col=4,pch=3,cex=1.5,
+               yaxs="i", xaxs="i",
+               xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
+          if(!is.null(late$l)){points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)}
+        }else{
+          par(bg="transparent")
+          plot(r$m$y~r$m$x,col=4,pch=3,cex=1.5, 
+               yaxs="i", xaxs="i",
+               xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") 
+          if(!is.null(late$l)){points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)}
+        }
+      }
     }
     band.sel <- function(band, band.end=NA, Nband=NA){
       # OJO: si band.end - band < Nband. Dar aviso
@@ -311,16 +335,28 @@ require(imager)
       }			
       res <- res[-v]
     }
+    
+    late <- function(x,res){# OJO: los puntos corregidos los pone a la altura
+      res <- sort(res)
+        res.end <- c()
+        for(i in 1:(length(res)-1)){
+          res.end[i] <- c(res[i]:res[i+1])[which.max(x[res[i]:res[i+1]])]
+        }
+        res.end[length(res)] <- which.max(x[res[length(res)]]:x[length(x)])+res[length(res)]-1
+        res.end
+    }
+
 
 # reactive ----------------------------------------------------------------
  
-    rv = reactiveValues(m=data.frame(x1=NA,y1=NA,x2=NA,y2=NA))
+    rv = reactiveValues(m=data.frame(x1=NA,y1=NA,x2=NA,y2=NA))# OJO: empieza en NA
     r = reactiveValues(m=NULL)
     sf = reactiveValues(r=c(0))
     sel = reactiveValues(sel=c(NA))
     ranges <- reactiveValues(x = NULL, y = NULL)
     smooth = reactiveValues(res = NULL)
     peak = reactiveValues(res = NULL)
+    late = reactiveValues(l=NULL)
     
 
 
@@ -336,8 +372,10 @@ require(imager)
     })
     
     output$plot3 <- renderPlot({
+      if(input$tabs!="measure"){
       plot(im,xlim=c(dim(im)[2]/2*-1,dim(im)[2]/2),ylim=c(dim(im)[2],0),asp="varying")
       rect(ranges$x[1]/abs(rsize.per), ranges$y[2]/abs(rsize.per), ranges$x[2]/abs(rsize.per), ranges$y[1]/abs(rsize.per))
+      }
     })
     
     
@@ -368,7 +406,26 @@ require(imager)
       }
     })
     
+    observeEvent(input$right,{
+      if(is.null(ranges$x)){
+      }else{
+        ran <- (ranges$x[2]-ranges$x[1])
+        ranges$x[1] <- ranges$x[1]+ran -(ran*0.5)
+        ranges$x[2] <- ranges$x[2]+ran -(ran*0.5)
+        
+      }
+    })
+    
     observeEvent(input$left,{
+      if(is.null(ranges$x)){
+      }else{
+        ran <- (ranges$x[2]-ranges$x[1])
+        ranges$x[1] <- ranges$x[1]-ran +(ran*0.5)
+        ranges$x[2] <- ranges$x[2]-ran +(ran*0.5)
+      }
+    })
+    
+    observeEvent(input$shift,{
       if(is.null(ranges$y)){
       }else{
         
@@ -382,7 +439,7 @@ require(imager)
       }
     })
     
-    observeEvent(input$right,{
+    observeEvent(input$ctrl,{
       if(is.null(ranges$y)){
       }else{
         
@@ -397,7 +454,6 @@ require(imager)
     })
     observeEvent(input$plot_click, {
       if(input$tabs=="line"){
-      #¸if(input$plot_click$x[1]>0 & input$plot_click$x[2]<dim(imc)[1] & input$plot_click$y[1]>0 & input$plot_click$y[2]<dim(imc)[2]){
       if(sf$r == 0){
         rv$m[nrow(rv$m)+1,1] <- input$plot_click$x
         rv$m[nrow(rv$m),2] <- input$plot_click$y
@@ -410,12 +466,20 @@ require(imager)
       if(input$tabs=="corr"){
         r$m <- rbind(r$m,unlist(input$plot_click))
       }
+      if(input$tabs=="late"){
+        late$l <- rbind(late$l,unlist(input$plot_click))
+      }
+      
     })
     dim(imc)
     observeEvent(input$plot_click2, {
       if(input$tabs=="corr"){
         np <- nearPoints(r$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
         r$m <- r$m[!np$selected_,]
+      }
+      if(input$tabs=="late"){
+        np <- nearPoints(late$l, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
+        late$l <- late$l[!np$selected_,]
       }
     })
     
@@ -430,7 +494,7 @@ require(imager)
       }}
     })
     
-    observeEvent(input$undok, {
+    observeEvent(input$undo_key, {
       if(input$tabs=="line"){
       if(nrow(rv$m)>0){
       if(is.na(rv$m[nrow(rv$m),3])){
@@ -440,23 +504,31 @@ require(imager)
         rv$m[nrow(rv$m),3:4] <- NA
         sf$r <- 1
       }}}
-      if(input$tabs=="corr"){
-        if(nrow(r$m)>0){
-        r$m <- r$m[-nrow(r$m),]
-        }
-      }
+      # if(input$tabs=="corr"){ # OJO: esto quita a ultima fila pero no el ultimo movimiento
+      #   if(nrow(r$m)>0){
+      #   r$m <- r$m[-nrow(r$m),]
+      #   }
+      #}
     })
     
      observeEvent(input$rese, {
-       r$m <- data.frame(x=res.s$x,y=res.s$y)
+       smooth_res <- smooth$res*(dim(imc)[1]/2/max(smooth$res))
+       peak_res <- peaks(smooth_res[,1],input$score,input$join)
+       r$m <- data.frame(x=input$band_x1, y=peak_res)
      })
      
-    observeEvent(input$save_l, {
-      write.csv(rv$m,input$file_l)
-    })
-    
+     observeEvent(input$rese_late, {
+       y_late <- late (smooth$res, r$m$y)
+       late$l <- data.frame(x=input$band_x1, y=y_late)
+     })
+     
     observeEvent(input$save_p, {
       write.csv(r$m,input$file_p)
+    })
+    
+    observeEvent(input$save_late, {
+      write.table(cbind(r$m,late$l),input$file_late,row.names=F)
+      
     })
     
     observeEvent(input$run_smooth,{  
@@ -474,6 +546,40 @@ require(imager)
       peak_res <- peaks(smooth_res[,1],input$score,input$join)
       r$m <- data.frame(x=input$band_x1, y=peak_res)
      }
+    )
+    
+    observeEvent(input$run_late,{  
+      y_late <- late (smooth$res, r$m$y)
+      late$l <- data.frame(x=input$band_x1, y=y_late)
+    }
+    )
+    
+    observeEvent(input$dis_ring,{  
+      res <- r$m
+      res <- res[order(res$y),]
+      for(i in 1:(nrow(res)-1)){
+          res[i,3] <- dist(res[c(i,i+1),1:2])
+      }
+      colnames(res)[3] <- "distance"
+      write.table(res,input$file_dis_ring,row.names=F)
+      }
+    )
+    
+    observeEvent(input$dis_late,{  
+      res <- cbind(r$m,late$l)
+      colnames(res)[c(3,4)] <-  c("xl","yl")
+      res <- res[order(res$y),]
+      for(i in 1:(nrow(res)-1)){
+        res[i,5] <- dist(res[c(i,i+1),1:2])
+        late.i <- res[i,3:4]; colnames(late.i)<- c("x","y")
+        early.i <- res[i+1,1:2]; colnames(early.i)<- c("x","y")
+        res[i,6] <- dist(rbind(late.i,early.i))
+      }
+      res[,7] <- apply(res,1,function(x)dist(rbind(c(x[1],x[2]),c(x[3],x[4]))))
+      
+      colnames(res)[c(5,6,7)] <- c("ring","early","late")
+      write.table(res,input$file_dis_late,row.names=F)
+    }
     )
     
   }
