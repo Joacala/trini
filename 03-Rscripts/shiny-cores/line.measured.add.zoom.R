@@ -82,29 +82,29 @@ require(imager)
                                         max = dim(imc)[1],
                                         step = 1),
                            numericInput(inputId = "hdm", 
-                                        label = "Heigh down", 
+                                        label = "smooth area", 
                                         value = 10,
                                         min = 0, 
                                         max = dim(imc)[2], 
                                         step = 1),
-                           numericInput(inputId = "wdm", 
-                                        label = "Width down", 
-                                        value = 10,
-                                        min = 0, 
-                                        max = dim(imc)[1], 
-                                        step = 1),
-                           numericInput(inputId = "hum", 
-                                        label = "Heigh up", 
-                                        value = 10,
-                                        min = 0, 
-                                        max = dim(imc)[2], 
-                                        step = 1),
-                           numericInput(inputId = "wum", 
-                                        label = "Width up", 
-                                        value = 10,
-                                        min = 0, 
-                                        max = dim(imc)[1], 
-                                        step = 1),
+                           # numericInput(inputId = "wdm", 
+                           #              label = "Width down", 
+                           #              value = 10,
+                           #              min = 0, 
+                           #              max = dim(imc)[1], 
+                           #              step = 1),
+                           # numericInput(inputId = "hum", 
+                           #              label = "Heigh up", 
+                           #              value = 10,
+                           #              min = 0, 
+                           #              max = dim(imc)[2], 
+                           #              step = 1),
+                           # numericInput(inputId = "wum", 
+                           #              label = "Width up", 
+                           #              value = 10,
+                           #              min = 0, 
+                           #              max = dim(imc)[1], 
+                           #              step = 1),
                            numericInput(inputId = "alpha", 
                                         label = "D weight", 
                                         value = 0,
@@ -254,18 +254,34 @@ require(imager)
         if(is.null(r)){
           return(NULL)
         }
+        
+        if(!is.null(late$l)){
+          pch.v <- c()
+          col.v <- c()
+          for(i in 1:(nrow(r$m)-1)){
+            if(sum(late$l$y>=r$m$y[i] & late$l$y<=r$m$y[i+1])!=1){
+              pch.v[i] <- 19
+              col.v[i] <- 1
+            }else{pch.v[i] <- 3 ; col.v[i] <- 4}
+          }
+        }else{pch.v <- 3 ; col.v <- 4}
+        
         if(is.null(ranges$x) | is.null(ranges$y)){
           par(bg="transparent")
-          plot(r$m$y~r$m$x,col=4,pch=3,cex=1.5,
+          plot(r$m$y~r$m$x,col=col.v,pch=pch.v,cex=1.5,
                yaxs="i", xaxs="i",
                xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
-          if(!is.null(late$l)){points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)}
+          if(!is.null(late$l)){
+            points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)
+          }
         }else{
           par(bg="transparent")
-          plot(r$m$y~r$m$x,col=4,pch=3,cex=1.5, 
+          plot(r$m$y~r$m$x,col=col.v,pch=pch.v,cex=1.5, 
                yaxs="i", xaxs="i",
                xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") 
-          if(!is.null(late$l)){points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)}
+          if(!is.null(late$l)){
+            points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)
+            }
         }
       }
     }
@@ -274,6 +290,21 @@ require(imager)
       sel <- round(seq(band,band.end,length=Nband))
       
     }
+    
+    gaus_decay_w <- function(alpha,t){
+      #y(t)~yf+(y0-yf)e-alpha*t
+      #t : distance
+      1/(1 * exp(alpha * t))
+    }
+    
+    decay.gaus.2d <- function(alpha,th, tv){
+      #x <- matrix
+      w.h <- gaus_decay_w(alpha,th)
+      w.v <- gaus_decay_w(alpha,tv)
+      matrix(rep(w.h,each=length(tv)),ncol=length(th))*w.v
+      #sum(x*mat.w)/sum(mat.w)
+    }
+    
     clever.smooth <- function(x, sel, ldm, ldms, lum, lums,  alpha){
       
       #x : ## matrix
@@ -335,14 +366,21 @@ require(imager)
       }			
       res <- res[-v]
     }
+
     
-    late <- function(x,res){# OJO: los puntos corregidos los pone a la altura
-      res <- sort(res)
-        res.end <- c()
-        for(i in 1:(length(res)-1)){
-          res.end[i] <- c(res[i]:res[i+1])[which.max(x[res[i]:res[i+1]])]
+    late.f <- function(x,res){# OJO: los puntos corregidos los pone a la altura
+      res.o <-res[order(res$y),] 
+      res.y <- res.o$y
+        
+      res.end.y <- c()
+        for(i in 1:(length(res.y)-1)){
+          id.max <- which.max(x[res.y[i]:res.y[i+1]])
+          res.end.y[i] <- c(res.y[i]:res.y[i+1])[id.max]
+
         }
-        res.end[length(res)] <- which.max(x[res[length(res)]]:x[length(x)])+res[length(res)]-1
+        id.max <- which.max(x[res.y[length(res.y)]:length(x)])
+        res.end.y[length(res.y)] <-c(res.y[length(res.y)]:length(x))[id.max]
+        res.end <- data.frame(x=res.o$x,y=res.end.y)
         res.end
     }
 
@@ -465,6 +503,7 @@ require(imager)
       }}#}
       if(input$tabs=="corr"){
         r$m <- rbind(r$m,unlist(input$plot_click))
+        r$m <- r$m[order(r$m$y),]
       }
       if(input$tabs=="late"){
         late$l <- rbind(late$l,unlist(input$plot_click))
@@ -518,12 +557,11 @@ require(imager)
      })
      
      observeEvent(input$rese_late, {
-       y_late <- late (smooth$res, r$m$y)
-       late$l <- data.frame(x=input$band_x1, y=y_late)
+       late$l <- late.f (smooth$res, r$m)
      })
      
     observeEvent(input$save_p, {
-      write.csv(r$m,input$file_p)
+      write.table(r$m,input$file_p,sep=" ",row.names=F)
     })
     
     observeEvent(input$save_late, {
@@ -537,7 +575,7 @@ require(imager)
       if(input$line_type == "mul"){
         sel$sel <- band.sel(input$band_x1,input$band_xn,input$band_N)
       }
-      smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$wdm, input$hum, input$wum,  input$alpha)
+      smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha)
       }
     )
     
@@ -549,8 +587,7 @@ require(imager)
     )
     
     observeEvent(input$run_late,{  
-      y_late <- late (smooth$res, r$m$y)
-      late$l <- data.frame(x=input$band_x1, y=y_late)
+      late$l <- late.f (smooth$res, r$m)
     }
     )
     
