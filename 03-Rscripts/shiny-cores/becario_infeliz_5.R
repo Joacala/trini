@@ -2,11 +2,11 @@
 ###################################################################################################################
 ###################################################################################################################
 EXAMPLE
-source("C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\functions_ringmer.R")
+source("03-Rscripts\\shiny-cores\\functions_ringmer.R")
 library(imager)
 
 ### cargar datos
-imc <- load.image("C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\jaime_pino.png")
+imc <- load.image("02-data\\jaime_pino.png")
 #imc <- resize(imc,round(width(imc)/3),round(height(imc)/3))
 img <- imc
 img <- flatten.alpha(img, bg = "white")
@@ -184,14 +184,14 @@ dev.off()
 # :::::::::: #
 
 plot(img)
-band <- 21# round(ncol(g)/2)
-band.end <- ncol(g)-21
-Nband <- 15
-even =F
+band <-115
+band.end <- 145
+Nband <- 10
+even =T
 abline(v=band)
 abline(v=band.end)
 cor.threshold <- 0.8
-sel <- band.sel (g, band, cor.threshold,even,band.end,Nband) 
+sel <- band.sel (g, band,band.end,Nband) 
 
 # ::::::::::::::: #
 # PEAK DETECTION  #
@@ -209,7 +209,7 @@ join.dis <- 5
 adaptive <- F
 late <- F
 score <- -0.0175
-res <- lapply(gs,peaks,score,join.dis,adaptive,late)
+res <- apply(gs,2,peaks,score,join.dis,adaptive,late)
 
 
 #tardia
@@ -234,6 +234,7 @@ res <- lapply(gs,peaks,score,join.dis,adaptive,late)
 # ::::::::::::::: #
 join.dis <- 6
 clu.peaks <- clus.peak.bands(res,join.dis,sel)
+rings.m(clu.peaks, 0.5, sel, 0.05,F)
 
 
 #pdf("kk1.pdf")
@@ -247,44 +248,44 @@ clu.peaks <- clus.peak.bands(res,join.dis,sel)
 # :::::::::::::::  #
 # MEASURE	      #  
 # :::::::::::::::: #
-band <- 31#round(ncol(g)/2)
-band.end <- ncol(g)-31
-Nband <- 21
+band <- 115#round(ncol(g)/2)
+band.end <- 145
+Nband <- 10
 even =T
 cor.threshold <- 0.5
-distance <- T
-prob.threshold <- 0.1
+distance <- F
+prob.threshold <- 0.5
 sig.alpha <- 0.05
 join.dis.intra <- 10
 join.dis.inter <- 10
 adaptive <- F
 late <- F
 score <- -0.01
-ldm <- 1 ## Heigh down mean
-lum <- 1 ## Heigh upper mean
-lums <- 30 ## width upper mean
-ldms <- 30 ## width side mean
+ldm <- 10 ## Heigh down mean
+lum <- 10 ## Heigh upper mean
+lums <- 10 ## width upper mean
+ldms <- 10 ## width side mean
 alpha <- 0 ; plot(gaus_decay_w(1:ldms,alpha)) ## gaussian decay exponent (0 = no decay; 0> increase decay); 
 
 
 start_time <- Sys.time()
-sel <- band.sel (g, band, cor.threshold,even,band.end,Nband) 
+sel <- band.sel (g, band, band.end,Nband) 
 gs <- clever.smooth (g, sel, ldm, ldms, lum, lums,  alpha)
-res <- lapply(gs,peaks,score,join.dis.intra,adaptive,late)
-clu.peaks <- clus.peak.bands(res,join.dis.inter,sel)
+pik <- apply(gs,2,peaks,score,join.dis.intra)
+clu.peaks <- clus.peak.bands(pik,join.dis.inter,sel)
 res <- rings.m (clu.peaks, prob.threshold, sel, sig.alpha, distance)
 end_time <- Sys.time()
 end_time - start_time
 
 path <- "C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\resultados\\"
-name <- "jaime_incana.PDF"
+name <- "multi_pr.PDF"
 par <- paste("ldm_",ldm,"-lum_",lum,"-lums_",lums,"-ldms_",ldms,"-alpha_",alpha,"-adaptive_",adaptive,"-score_",score,"-join.dis.inter_",join.dis.inter,"_",sep="")
 
 pdf(paste(path,par,name,sep=""))
 plot(imc)
 apply(res,1,function(x)segments(x[5],x[6],x[7],x[8],lwd=0.05,lty=1,col=2))
-#apply(res,1,function(x)points(x[5],x[6],pch="+",col=3,cex=0.1))
-#apply(res,1,function(x)points(x[7],x[8],pch="*",col=4,cex=0.05))
+apply(res,1,function(x)points(x[5],x[6],pch="+",col=3,cex=0.1))
+apply(res,1,function(x)points(x[7],x[8],pch="*",col=4,cex=0.05))
 apply(res,1,function(x)segments(sel[1],x[1]+x[2]*sel[1],sel[Nband],x[1]+x[2]*sel[Nband],lwd=0.05,lty=1,col=1))
 dev.off()
 

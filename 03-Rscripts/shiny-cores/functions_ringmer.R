@@ -133,6 +133,10 @@ band.sel <- function(x, band, band.end=NA, Nband=NA){
 # sel: selected bands
 
 clus.peak.bands <- function(x, join.dis, sel){
+  
+  # x : list of peaks of each band 
+  # join.dis: cluster peaks from different at a <=join.dis heigh (pixels)
+  # sel: selected bands
 
 	clus.l <- list()
 	i=0
@@ -175,9 +179,14 @@ clus.peak.bands <- function(x, join.dis, sel){
 #y :  vector with clustered points value of function clus.peak.bands
 #sig.alpha : p-value threshold clasified regression as significant 
 #pendendicular slope = -1/slope
-#new intercept crossing center = y.center = new inter + pendendicular slope* x.center; new inter = y.center - pendendicular slope* x.center
+#new intercept crossing center = y.center = new inter + pendendicular slope* x.center; new inter = y.center - perpendicular slope* x.center
 
 find.perpendicular <- function(y,sig.alpha=0.05,sel){
+  #y :  vector with clustered points value of function clus.peak.bands
+  #sig.alpha : p-value threshold classified regression as significant 
+  #perpendicular slope = -1/slope
+  #new intercept crossing center = y.center = new inter + perpendicular slope* x.center; new inter = y.center - perpendicular slope* x.center
+  
 	x <- as.numeric(names(y))
 	lms <- summary(lm(y ~ x))
 	mode(sel)
@@ -203,8 +212,9 @@ find.perpendicular <- function(y,sig.alpha=0.05,sel){
 ###################################################################################################################
 ###################################################################################################################
 ###################################################################################################################
-#x : output of find.perpendicular
+
 intersection.point <- function(x){
+  #x : output of find.perpendicular
 	x <- x[order(sapply(x,function(x)x["y"]))]
 	res <- list()
 	for(i in 1:(length(x)-1)){
@@ -236,6 +246,13 @@ res
 #sig.alpha : p-value threshold clasified regression as significant 
 
 rings.m <- function(x, prob.threshold, sel, sig.alpha, distance){
+  
+  #x : value of clus.peak.bands
+  #prob.threshold : ring probability of occurring across bands
+  #sel : selected bands
+  #distance:calculate distances between consecutive rings
+  #sig.alpha : p-value threshold clasified regression as significant 
+  
 	p <- sapply(x,function(x)length(x)/length(sel))
 	clus.m <- x[p>prob.threshold]
 	fp <- lapply(clus.m, find.perpendicular, sig.alpha, sel)

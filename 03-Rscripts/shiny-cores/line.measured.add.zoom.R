@@ -1,9 +1,11 @@
 ### set measure line
 library(imager)
 library(shiny)
-#library(shinyKnobs)
 library(keys)
+library(imager)
 
+### cargar datos
+imc <- load.image("02-data\\jaime_pino.png")
 
 line.measured <- function(imc,rsize.per){
 require(imager)
@@ -121,7 +123,20 @@ require(imager)
                                         min = 1, 
                                         max = dim(imc)[2], 
                                         step = 1),
-                           actionButton("run_peak_single", "Run single")),
+                           numericInput(inputId = "join.inter", 
+                                        label = "Cluster resolution", 
+                                        value = 10,
+                                        min = 1, 
+                                        max = dim(imc)[2], 
+                                        step = 1),
+                           numericInput(inputId = "p.threshold", 
+                                        label = "P threshold", 
+                                        value = 0.5,
+                                        min = 0, 
+                                        max = 1, 
+                                        step = 0.01),
+                           actionButton("run_peak_single", "Run single"),
+                           actionButton("run_peak_multi", "Run multi")),
                   tabPanel("Correction", value="corr",
                            actionButton("rese", "Reset"),
                            textInput("file_p", "File name", value = "points.csv"),
@@ -150,7 +165,7 @@ require(imager)
     addKeys("right", "right")
     addKeys("ctrl", "ctrl")
     addKeys("shift", "shift")
-    addKeys("undo_key","ctrl+z")
+   #addKeys("undo_key","ctrl+z")
     
 
 # functions ---------------------------------------------------------------
@@ -210,7 +225,7 @@ require(imager)
         }
         if(is.null(ranges$x) | is.null(ranges$y)){
           par(bg="transparent")
-          if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,1]*(dim(imc)[1]/2))/max(smooth$res)}
+          if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,1]*(dim(imc)[1]/2))/max(smooth$res)}# OJO: explicar cuando se hace multi que solo se plotea la initial band
           if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
                plot(yp~xp,col=4,pch=3,cex=1.5,
                yaxs="i", xaxs="i",
@@ -318,7 +333,7 @@ require(imager)
       res <- list()
       x[x==0] <- 1e-10
       for(i in sel){
-        #horizontal margins
+        #horizontal margins # OJO: si nos pasamos con el area de smooth
         #if(i<(ldms+1)){ldms <- ldms+(i-(ldms+1))}
         #if(ncol(x)< i+(ldms+1)){ldms <- ldms+(ncol(x)-(ldms+1))}
         #if(i-(lums+1)<0){lums <- lums+(i-(lums+1))}
@@ -350,6 +365,7 @@ require(imager)
       names(res) <- sel
       do.call(cbind,res)
     }
+    
     peaks <- function(x, score, join.dis){
       
       #x : vector where peaks are detected
@@ -367,7 +383,6 @@ require(imager)
       res <- res[-v]
     }
 
-    
     late.f <- function(x,res){# OJO: los puntos corregidos los pone a la altura
       res.o <-res[order(res$y),] 
       res.y <- res.o$y
@@ -383,12 +398,114 @@ require(imager)
         res.end <- data.frame(x=res.o$x,y=res.end.y)
         res.end
     }
+    
+    clus.peak.bands <- function(x, join.dis, sel){
+      
+      # x : list of peaks of each band 
+      # join.dis: cluster peaks from different bands at <=join.dis height (pixels)
+      # sel: selected bands
+      
+      clus.l <- list()
+      i=0
+      while (sum(sapply(x,length)>0)>0){
+        i=i+1
+        
+        ti <- x[[i]]
+        
+        for(j in 1:length(ti)){
+          dis <- lapply(x, function(x)abs(x-ti[j]))
+          sel.dis <- mapply(function(x,y)y[which(x<=join.dis)],x=dis ,y=x)
+          sel.dis <- lapply(sel.dis,function(x){if(length(x)>1){sample(x,1,replace=T)}else{x=x}})
+          names(sel.dis) <- sel
+          sel.dis<-unlist(sel.dis)
+          x <- mapply(function(x,y)y[which(x>join.dis)],x=dis ,y=x)
+          
+          z=0
+          while(z<length(sel.dis)){
+            z=z+1
+            dis <- lapply(x, function(x)abs(x-sel.dis[z]))
+            sel.dis.z <- mapply(function(x,y)y[which(x<=join.dis)],x=dis ,y=x)
+            sel.dis.z <- lapply(sel.dis.z,function(x){if(length(x)>1){sample(x,1,replace=T)}else{x=x}})
+            names(sel.dis.z) <- sel
+            sel.dis.z <- unlist(sel.dis.z)
+            sel.dis <- c(sel.dis, sel.dis.z)
+            x <- mapply(function(x,y)y[which(x>join.dis)],x=dis ,y=x)
+          }
+          clus.l[[length(clus.l)+1]]<- sel.dis
+        }
+      }
+      
+      clus.l
+    }
 
+    find.perpendicular <- function(y,sig.alpha=0.05,sel){
+      #y :  vector with clustered points value of function clus.peak.bands
+      #sig.alpha : p-value threshold classified regression as significant 
+      #perpendicular slope = -1/slope
+      #new intercept crossing center = y.center = new inter + perpendicular slope* x.center; new inter = y.center - perpendicular slope* x.center
+      
+      x <- as.numeric(names(y))
+      lms <- summary(lm(y ~ x))
+      mode(sel)
+      if(lms$coefficients[8]<=sig.alpha & !is.na(lms$coefficients[8])){
+        x.center <- mean(sel)
+        y.center <- lms$coefficients[1] +  lms$coefficients[2]*x.center
+        pendendicular.slope <- -1/lms$coefficients[2]
+        new.inter <- y.center - (-1/lms$coefficients[2])*x.center
+        res <- c(lms$coefficients[1],lms$coefficients[2],new.inter,pendendicular.slope,x.center,y.center)
+        names(res) <- c("intercept","slope","p.intercept","p.slope","x","y")
+      }else{
+        x.center <- mean(sel)
+        y.center <- mean(y)
+        pendendicular.slope <- 0
+        new.inter <- y.center
+        res <- c(y.center,0,new.inter,pendendicular.slope,x.center,y.center)
+        names(res) <- c("intercept","slope","p.intercept","p.slope","x","y")
+        
+      }
+      res
+    }
+    
+    intersection.point <- function(x){
+      #x : output of find.perpendicular
+      x <- x[order(sapply(x,function(x)x["y"]))]
+      res <- list()
+      for(i in 1:(length(x)-1)){
+        x0 <- x[[i]]
+        xi <- x[[i+1]]
+        if(x0["slope"]==0){
+          x.inter <- x0["x"]
+          y.inter <- xi["y"]
+        }else{
+          x.inter <- (x0["p.intercept"] - xi["intercept"])/(xi["slope"]-x0["p.slope"])
+          y.inter <- xi["slope"]*x.inter + xi["intercept"]
+        }
+        res.i <- c(x.inter,y.inter)	
+        names(res.i) <- c("x1","y1")
+        res[[i]]<-c(x0,res.i)
+      }
+      res
+    }
+    
+    rings.m <- function(x, prob.threshold, sel, sig.alpha){
+      
+      #x : value of clus.peak.bands
+      #prob.threshold : ring probability of occurring across bands
+      #sel : selected bands
+      #sig.alpha : p-value threshold clasified regression as significant 
+      
+      p <- sapply(x,function(x)length(x)/length(sel))
+      clus.m <- x[p>prob.threshold]
+      fp <- lapply(clus.m, find.perpendicular, sig.alpha, sel)
+      ip <- intersection.point(fp)
+      data.frame(do.call(rbind,ip))
+    }
 
 # reactive ----------------------------------------------------------------
  
     rv = reactiveValues(m=data.frame(x1=NA,y1=NA,x2=NA,y2=NA))# OJO: empieza en NA
     r = reactiveValues(m=NULL)
+    r.multi = reactiveValues(m=NULL)
     sf = reactiveValues(r=c(0))
     sel = reactiveValues(sel=c(NA))
     ranges <- reactiveValues(x = NULL, y = NULL)
@@ -419,7 +536,8 @@ require(imager)
     
 
 # observe events ----------------------------------------------------------
-
+    ## plot management ----------------------------------------------------------
+    
     observeEvent(input$plot1_brush, {
       ranges$x <- c(input$plot1_brush$xmin * abs(rsize.per), input$plot1_brush$xmax * abs(rsize.per))
       ranges$y <- c(input$plot1_brush$ymin * abs(rsize.per), input$plot1_brush$ymax * abs(rsize.per))
@@ -427,16 +545,18 @@ require(imager)
     
     observeEvent(input$up,{
       if(is.null(ranges$y)){
-      }else{
-        ran <- (ranges$y[2]-ranges$y[1])
-        ranges$y[1] <- ranges$y[1]-ran +(ran*0.5)
-        ranges$y[2] <- ranges$y[2]-ran +(ran*0.5)
-        
+        ranges$x = c(dim(imc)[2]/2*-1, dim(imc)[2]/2)
+        ranges$y = c(0,dim(imc)[2])
       }
+      ran <- (ranges$y[2]-ranges$y[1])
+      ranges$y[1] <- ranges$y[1]-ran +(ran*0.5)
+      ranges$y[2] <- ranges$y[2]-ran +(ran*0.5)
     })
     
     observeEvent(input$down,{
       if(is.null(ranges$y)){
+        ranges$x = c(dim(imc)[2]/2*-1, dim(imc)[2]/2)
+        ranges$y = c(0,dim(imc)[2])
       }else{
         ran <- (ranges$y[2]-ranges$y[1])
         ranges$y[1] <- ranges$y[1]+ran -(ran*0.5)
@@ -446,6 +566,8 @@ require(imager)
     
     observeEvent(input$right,{
       if(is.null(ranges$x)){
+        ranges$x = c(dim(imc)[2]/2*-1, dim(imc)[2]/2)
+        ranges$y = c(0,dim(imc)[2])
       }else{
         ran <- (ranges$x[2]-ranges$x[1])
         ranges$x[1] <- ranges$x[1]+ran -(ran*0.5)
@@ -456,6 +578,8 @@ require(imager)
     
     observeEvent(input$left,{
       if(is.null(ranges$x)){
+        ranges$x = c(dim(imc)[2]/2*-1, dim(imc)[2]/2)
+        ranges$y = c(0,dim(imc)[2])
       }else{
         ran <- (ranges$x[2]-ranges$x[1])
         ranges$x[1] <- ranges$x[1]-ran +(ran*0.5)
@@ -465,6 +589,8 @@ require(imager)
     
     observeEvent(input$shift,{
       if(is.null(ranges$y)){
+        ranges$x = c(dim(imc)[2]/2*-1, dim(imc)[2]/2)
+        ranges$y = c(0,dim(imc)[2])
       }else{
         
         py <- abs(ranges$y[2]-ranges$y[1])
@@ -479,6 +605,8 @@ require(imager)
     
     observeEvent(input$ctrl,{
       if(is.null(ranges$y)){
+        ranges$x = c(dim(imc)[2]/2*-1, dim(imc)[2]/2)
+        ranges$y = c(0,dim(imc)[2])
       }else{
         
         py <- abs(ranges$y[2]-ranges$y[1])
@@ -490,6 +618,7 @@ require(imager)
         
       }
     })
+    
     observeEvent(input$plot_click, {
       if(input$tabs=="line"){
       if(sf$r == 0){
@@ -522,6 +651,8 @@ require(imager)
       }
     })
     
+    ## lines events ----------------------------------------------------------
+    
     observeEvent(input$undo, {
       if(nrow(rv$m)>0){
       if(is.na(rv$m[nrow(rv$m),3])){
@@ -533,41 +664,25 @@ require(imager)
       }}
     })
     
-    observeEvent(input$undo_key, {
-      if(input$tabs=="line"){
-      if(nrow(rv$m)>0){
-      if(is.na(rv$m[nrow(rv$m),3])){
-        rv$m <- rv$m[-nrow(rv$m),]
-        sf$r <- 0
-      }else{
-        rv$m[nrow(rv$m),3:4] <- NA
-        sf$r <- 1
-      }}}
-      # if(input$tabs=="corr"){ # OJO: esto quita a ultima fila pero no el ultimo movimiento
-      #   if(nrow(r$m)>0){
-      #   r$m <- r$m[-nrow(r$m),]
-      #   }
-      #}
-    })
+    # observeEvent(input$undo_key, {
+    #   if(input$tabs=="line"){
+    #   if(nrow(rv$m)>0){
+    #   if(is.na(rv$m[nrow(rv$m),3])){
+    #     rv$m <- rv$m[-nrow(rv$m),]
+    #     sf$r <- 0
+    #   }else{
+    #     rv$m[nrow(rv$m),3:4] <- NA
+    #     sf$r <- 1
+    #   }}}
+    #   # if(input$tabs=="corr"){ # OJO: esto quita a ultima fila pero no el ultimo movimiento
+    #   #   if(nrow(r$m)>0){
+    #   #   r$m <- r$m[-nrow(r$m),]
+    #   #   }
+    #   #}
+    # })
+    # 
     
-     observeEvent(input$rese, {
-       smooth_res <- smooth$res*(dim(imc)[1]/2/max(smooth$res))
-       peak_res <- peaks(smooth_res[,1],input$score,input$join)
-       r$m <- data.frame(x=input$band_x1, y=peak_res)
-     })
-     
-     observeEvent(input$rese_late, {
-       late$l <- late.f (smooth$res, r$m)
-     })
-     
-    observeEvent(input$save_p, {
-      write.table(r$m,input$file_p,sep=" ",row.names=F)
-    })
-    
-    observeEvent(input$save_late, {
-      write.table(cbind(r$m,late$l),input$file_late,row.names=F)
-      
-    })
+    ## smooth events ----------------------------------------------------------
     
     observeEvent(input$run_smooth,{  
       if(input$line_type == "int"){sel$sel <- input$band_x1}
@@ -576,20 +691,61 @@ require(imager)
         sel$sel <- band.sel(input$band_x1,input$band_xn,input$band_N)
       }
       smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha)
-      }
+    }
     )
+    
+    ## ring events ----------------------------------------------------------
     
     observeEvent(input$run_peak_single,{  
       smooth_res <- smooth$res*(dim(imc)[1]/2/max(smooth$res))
       peak_res <- peaks(smooth_res[,1],input$score,input$join)
       r$m <- data.frame(x=input$band_x1, y=peak_res)
-     }
+    }
     )
+    
+    observeEvent(input$run_peak_multi,{
+      smooth_res <- apply(smooth$res, 2, function(x){x*(dim(imc)[1]/2/max(x))})
+      peaks.multi <- apply(smooth_res,2,peaks,input$score,input$join)
+
+      c.peak <- clus.peak.bands (peaks.multi, input$join.inter, sel$sel)
+      res <- rings.m(c.peak, input$p.threshold, sel$sel, 0.05)
+      r$m <- data.frame(x=res$x, y=res$y)
+      r.multi <- data.frame(x=res$x1, y=res$y1)
+      
+    }
+    )
+    
+    ## correction events ----------------------------------------------------------
+    
+     observeEvent(input$rese, {
+       smooth_res <- smooth$res*(dim(imc)[1]/2/max(smooth$res))
+       peak_res <- peaks(smooth_res[,1],input$score,input$join)
+       r$m <- data.frame(x=input$band_x1, y=peak_res)
+     })
+     
+
+    observeEvent(input$save_p, {
+      write.table(r$m,input$file_p,sep=" ",row.names=F)
+    })
+    
+    ## late events ----------------------------------------------------------
+    
+    
+    observeEvent(input$save_late, {
+      write.table(cbind(r$m,late$l),input$file_late,row.names=F)
+      
+    })
     
     observeEvent(input$run_late,{  
       late$l <- late.f (smooth$res, r$m)
     }
     )
+    
+    observeEvent(input$rese_late, {
+      late$l <- late.f (smooth$res, r$m)
+    })
+    
+    ## measures events ----------------------------------------------------------
     
     observeEvent(input$dis_ring,{  
       res <- r$m
@@ -626,10 +782,9 @@ require(imager)
 }
 
 
-path <- "C:/Users/F541U/Desktop/proyectos/Julen/"
 rsize.per <- -10
 line.measured(imc,rsize.per)
 
 
-getwd()
+
 
