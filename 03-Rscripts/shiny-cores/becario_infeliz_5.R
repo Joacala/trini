@@ -271,11 +271,14 @@ alpha <- 0 ; plot(gaus_decay_w(1:ldms,alpha)) ## gaussian decay exponent (0 = no
 start_time <- Sys.time()
 sel <- band.sel (g, band, band.end,Nband) 
 gs <- clever.smooth (g, sel, ldm, ldms, lum, lums,  alpha)
-pik <- apply(gs,2,peaks,score,join.dis.intra)
+pik <- apply(gs,2,peaks,score,join.dis.intra,F,F)
 clu.peaks <- clus.peak.bands(pik,join.dis.inter,sel)
 res <- rings.m (clu.peaks, prob.threshold, sel, sig.alpha, distance)
 end_time <- Sys.time()
 end_time - start_time
+
+names(res)
+
 
 path <- "C:\\Users\\F541U\\Desktop\\proyectos\\Julen\\resultados\\"
 name <- "multi_pr.PDF"

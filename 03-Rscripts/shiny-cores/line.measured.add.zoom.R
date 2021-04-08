@@ -2,10 +2,9 @@
 library(imager)
 library(shiny)
 library(keys)
-library(imager)
 
-### cargar datos
-imc <- load.image("02-data\\jaime_pino.png")
+
+dim(x)
 
 line.measured <- function(imc,rsize.per){
 require(imager)
@@ -73,46 +72,34 @@ require(imager)
                                         step = 1),
                            numericInput(inputId = "band_xn", 
                                         label = "Final band", 
-                                        value = round(dim(imc)[1]/2),
+                                        value = round(dim(imc)[1]-dim(imc)[1]*0.1),
                                         min = 0, 
                                         max = dim(imc)[1],
                                         step = 1),
                            numericInput(inputId = "band_N", 
                                         label = "N bands", 
-                                        value = 1,
-                                        min = 1, 
+                                        value = 10,
+                                        min = 2, 
                                         max = dim(imc)[1],
                                         step = 1),
                            numericInput(inputId = "hdm", 
                                         label = "smooth area", 
-                                        value = 10,
+                                        value = round(dim(imc)[1]*0.1),
                                         min = 0, 
                                         max = dim(imc)[2], 
                                         step = 1),
-                           # numericInput(inputId = "wdm", 
-                           #              label = "Width down", 
-                           #              value = 10,
-                           #              min = 0, 
-                           #              max = dim(imc)[1], 
-                           #              step = 1),
-                           # numericInput(inputId = "hum", 
-                           #              label = "Heigh up", 
-                           #              value = 10,
-                           #              min = 0, 
-                           #              max = dim(imc)[2], 
-                           #              step = 1),
-                           # numericInput(inputId = "wum", 
-                           #              label = "Width up", 
-                           #              value = 10,
-                           #              min = 0, 
-                           #              max = dim(imc)[1], 
-                           #              step = 1),
-                           numericInput(inputId = "alpha", 
+                         numericInput(inputId = "alpha", 
                                         label = "D weight", 
                                         value = 0,
                                         min = 0, 
                                         max = 100, 
                                         step = 1),
+                         numericInput(inputId = "show.band", 
+                                      label = "Show band (if multi)", 
+                                      value = 1,
+                                      min = 1, 
+                                      max = dim(imc)[1], 
+                                      step = 1),
                            actionButton("run_smooth", "Run")),
                   tabPanel("Ring detection",value="score.p",
                            sliderInput("score","Score", min = round(slider.size,2), max = 0, round=-2,step=0.01,
@@ -129,23 +116,23 @@ require(imager)
                                         min = 1, 
                                         max = dim(imc)[2], 
                                         step = 1),
-                           numericInput(inputId = "p.threshold", 
-                                        label = "P threshold", 
-                                        value = 0.5,
-                                        min = 0, 
-                                        max = 1, 
-                                        step = 0.01),
-                           actionButton("run_peak_single", "Run single"),
-                           actionButton("run_peak_multi", "Run multi")),
+                           actionButton("run_peak_single", "Detect single"),
+                           actionButton("run_peak_multi", "Detect multi"),
+                           sliderInput("prob","Probability", min = 0, max = 1, round=-2,step=0.01,
+                              value = 0.5),
+                           actionButton("select_multi", "Select multi")),
+                  
                   tabPanel("Correction", value="corr",
                            actionButton("rese", "Reset"),
-                           textInput("file_p", "File name", value = "points.csv"),
-                           actionButton("save_p", "Save")),
+                           radioButtons(
+                             inputId = "cor_type",
+                             label = "Correction type",
+                             choices = list("Single" = "single",
+                                            "Multi" = "multi")),
+                           actionButton("accept", "Accept changes")),
                   tabPanel("Late wood", value="late",
                            actionButton("run_late", "Run"),
-                           actionButton("rese_late", "Reset"),
-                           textInput("file_late", "File name", value = "late.csv"),
-                           actionButton("save_late", "Save")),
+                           actionButton("rese_late", "Reset")),
                   tabPanel("Measures", value="measure",
                            textInput("file_dis_ring", "Compute and save distances between rings", value = "distance_ring.csv"),
                            actionButton("dis_ring", "Run & save"),
@@ -163,8 +150,8 @@ require(imager)
     addKeys("up", "up")
     addKeys("left", "left")
     addKeys("right", "right")
-    addKeys("ctrl", "ctrl")
-    addKeys("shift", "shift")
+    addKeys("o", "o")
+    addKeys("i", "i")
    #addKeys("undo_key","ctrl+z")
     
 
@@ -182,7 +169,15 @@ require(imager)
     }
   
     app.plot.sct <- function(rv){
-      # OJO: simplificar codigo repetido
+      
+      if(is.null(ranges$x) | is.null(ranges$y)){
+        xli <- c(dim(imc)[2]/2*-1,dim(imc)[2]/2)
+        yli <- c(dim(imc)[2],0)
+      }else{
+        xli <- ranges$x
+        yli <- c(ranges$y[2], ranges$y[1])
+      }
+      
       if(input$tabs=="line"){
        if(is.null(ranges$x) ){
         par(bg="transparent")
@@ -207,41 +202,48 @@ require(imager)
         if(is.null(r)){
           return(NULL)
         }
-        if(is.null(ranges$x) | is.null(ranges$y)){
-          par(bg="transparent")
-          plot(r$m$y~r$m$x,col=4,pch=3,cex=1.5,
+        
+        par(bg="transparent")
+
+        if(input$cor_type == "single"){        
+          plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
                yaxs="i", xaxs="i",
-               xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
-        }else{
-          par(bg="transparent")
-          plot(r$m$y~r$m$x,col=4,pch=3,cex=1.5, 
-               yaxs="i", xaxs="i",
-               xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") # ylim: importante para que no le de la vuelta a la imagen al hacer zoom
+               xlim=xli ,ylim=yli,xlab="",ylab="")
         }
-      }
+        if(input$cor_type == "multi"){
+            plot(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,
+               yaxs="i", xaxs="i",
+               xlim=xli ,ylim=yli,xlab="",ylab="")
+            apply(r.multi$m,1,function(x)segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1))
+            points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,col=4)
+        }
+      }      
       if(input$tabs=="score.p"){
-        if(is.null(r)){
-          return(NULL)
-        }
-        if(is.null(ranges$x) | is.null(ranges$y)){
+
           par(bg="transparent")
-          if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,1]*(dim(imc)[1]/2))/max(smooth$res)}# OJO: explicar cuando se hace multi que solo se plotea la initial band
-          if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
+          if(is.null(smooth$res)){gst=0} else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/max(smooth$res[,show.band$sb])}
+   
+          if(input$line_type=="sin"){
+           if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
                plot(yp~xp,col=4,pch=3,cex=1.5,
                yaxs="i", xaxs="i",
-               xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
-              lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
-              abline(v=input$score)
-        }else{
-          par(bg="transparent")
-          if(is.null(smooth$res)){gst=0} else{gst <- (smooth$res[,1]*(dim(imc)[1]/2))/max(smooth$res)}
-          if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
-               plot(yp~xp,col=4,pch=3,cex=1.5,
-               yaxs="i", xaxs="i",
-               xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") # ylim: importante para que no le de la vuelta a la imagen al hacer zoom
+               xlim=xli,  ylim = yli,xlab="",ylab="") 
                lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
                abline(v=input$score)
+          }
+        if(input$line_type=="mul"){
+          if(is.null(r.multi$m)){yp <- xp <- -1}else{yp <- r.multi$m$y; xp <- r.multi$m$x}
+          if(is.null(p$pval)){prob=dim(imc)[1];y=0}else{prob=p$pval$prob*dim(imc)[1]+dim(imc)[1];y<-p$pval$y}
+               plot(yp~xp,col=4,pch=3,cex=1.5,
+               yaxs="i", xaxs="i",
+               xlim=xli,  ylim = yli,xlab="",ylab="") 
+               lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
+               abline(v=input$score)
+               segments(dim(imc)[1],y,prob,y,lwd=0.1,col=2)
+               axis(side = 3, at = c(dim(imc)[1], dim(imc)[1]*2), labels = c(0,1))
+               abline(v=input$prob*dim(imc)[1]+dim(imc)[1])
         }
+               
       }
       if(input$tabs=="smooth"){
         if(is.null(r)){
@@ -249,7 +251,7 @@ require(imager)
         }
         if(is.null(ranges$x) | is.null(ranges$y)){
           par(bg="transparent")
-          if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,1]*(dim(imc)[1]/2))/max(smooth$res[,1])}
+          if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/max(smooth$res[,show.band$sb])}
           if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
           plot(yp~xp,col=4,pch="",cex=1.5,
                yaxs="i", xaxs="i",
@@ -257,7 +259,7 @@ require(imager)
           lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
         }else{
           par(bg="transparent")
-          if(is.null(smooth$res)){gst=0} else{gst <- (smooth$res[,1]*(dim(imc)[1]/2))/max(smooth$res[,1])}
+          if(is.null(smooth$res)){gst=0} else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/max(smooth$res[,show.band$sb])}
           if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
           plot(yp~xp,col=4,pch="",cex=1.5,
                yaxs="i", xaxs="i",
@@ -265,7 +267,7 @@ require(imager)
           lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
         }
       }
-      if(input$tabs=="late"){ # OJO: cuando se quite un punto late y no haya correspondecia poner un punto
+      if(input$tabs=="late"){ 
         if(is.null(r)){
           return(NULL)
         }
@@ -297,6 +299,27 @@ require(imager)
           if(!is.null(late$l)){
             points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)
             }
+        }
+      }
+      if(input$tabs=="measure"){
+        if(is.null(r)){
+          return(NULL)
+        }
+
+        par(bg="transparent")
+        
+        if(input$cor_type == "single"){        
+          plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
+               yaxs="i", xaxs="i",
+               xlim=xli ,ylim=yli,xlab="",ylab="")
+        }
+        if(input$cor_type == "multi"){
+          plot(r.multi$m$y~r.multi$m$x,pch="",cex=1.5,
+               yaxs="i", xaxs="i",
+               xlim=xli ,ylim=yli,xlab="",ylab="")
+          apply(r.multi$m,1,function(x)segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1))
+          apply(r.multi$m,1,function(x)segments(x[5],x[6],x[7],x[8],lwd=0.05,lty=1,col=2))
+          
         }
       }
     }
@@ -494,8 +517,8 @@ require(imager)
       #sel : selected bands
       #sig.alpha : p-value threshold clasified regression as significant 
       
-      p <- sapply(x,function(x)length(x)/length(sel))
-      clus.m <- x[p>prob.threshold]
+      p <- sapply(x,function(x)length(unique(names(x)))/length(sel))
+      clus.m <- x[p>=prob.threshold]
       fp <- lapply(clus.m, find.perpendicular, sig.alpha, sel)
       ip <- intersection.point(fp)
       data.frame(do.call(rbind,ip))
@@ -512,9 +535,11 @@ require(imager)
     smooth = reactiveValues(res = NULL)
     peak = reactiveValues(res = NULL)
     late = reactiveValues(l=NULL)
-    
-
-
+    show.band = reactiveValues(sb=1)
+    c.peak <- reactiveValues(cp=NULL)
+    p <- reactiveValues(pval=NULL)
+    num.click.cor = reactiveValues(r = c(0))
+    data.cor.multi = reactiveValues(m = NULL)
     
 # plots -------------------------------------------------------------------
     
@@ -527,10 +552,8 @@ require(imager)
     })
     
     output$plot3 <- renderPlot({
-      if(input$tabs!="measure"){
       plot(im,xlim=c(dim(im)[2]/2*-1,dim(im)[2]/2),ylim=c(dim(im)[2],0),asp="varying")
       rect(ranges$x[1]/abs(rsize.per), ranges$y[2]/abs(rsize.per), ranges$x[2]/abs(rsize.per), ranges$y[1]/abs(rsize.per))
-      }
     })
     
     
@@ -587,7 +610,7 @@ require(imager)
       }
     })
     
-    observeEvent(input$shift,{
+    observeEvent(input$i,{
       if(is.null(ranges$y)){
         ranges$x = c(dim(imc)[2]/2*-1, dim(imc)[2]/2)
         ranges$y = c(0,dim(imc)[2])
@@ -603,7 +626,7 @@ require(imager)
       }
     })
     
-    observeEvent(input$ctrl,{
+    observeEvent(input$o,{
       if(is.null(ranges$y)){
         ranges$x = c(dim(imc)[2]/2*-1, dim(imc)[2]/2)
         ranges$y = c(0,dim(imc)[2])
@@ -629,21 +652,69 @@ require(imager)
         rv$m[nrow(rv$m),3] <- input$plot_click$x
         rv$m[nrow(rv$m),4] <- input$plot_click$y
         sf$r <- 0
-      }}#}
+      }}
       if(input$tabs=="corr"){
-        r$m <- rbind(r$m,unlist(input$plot_click))
-        r$m <- r$m[order(r$m$y),]
+        if(input$cor_type == "single"){
+          r$m <- rbind(r$m,unlist(input$plot_click))
+          r$m <- r$m[order(r$m$y),]
+        }
+        if(input$cor_type == "multi"){
+          if(num.click.cor$r == 0){
+            data.cor.multi$m <- unlist(input$plot_click)
+            num.click.cor$r <- 1
+          }else{
+            num.click.cor$r <- 0
+            
+            data.cor.multi$m <- rbind(data.cor.multi$m,unlist(input$plot_click))
+            
+            #pendiente
+            m <- (data.cor.multi$m[1,2]-data.cor.multi$m[2,2])/(data.cor.multi$m[1,1]-data.cor.multi$m[2,1])
+       
+            #intercepto
+            b <- data.cor.multi$m[1,2] - m * data.cor.multi$m[1,1] 
+            
+            # perdendicular 
+            x.center <- mean(c(data.cor.multi$m[1,1],data.cor.multi$m[2,1]))
+            y.center <- b +  m * x.center
+            pendendicular.slope <- -1/m
+            new.inter <- y.center - (-1/m) * x.center
+            r.multi$m[nrow(r.multi$m)+1,c(1:6,9:10)] <- c(b,m,new.inter,pendendicular.slope,x.center,y.center,data.cor.multi$m[1,1],data.cor.multi$m[2,1])
+
+            # interseccion
+            r.multi$m <- r.multi$m[order(r.multi$m$y),]
+            NAs <- which(is.na(r.multi$m[,7]))
+            
+            for(i in (NAs-1):NAs){
+              x0 <-r.multi$m[i,]
+              xi <- r.multi$m[i+1,]
+              if(x0["slope"]==0){
+                x.inter <- x0["x"]
+                y.inter <- xi["y"]
+              }else{
+                x.inter <- (x0["p.intercept"] - xi["intercept"])/(xi["slope"]-x0["p.slope"])
+                y.inter <- xi["slope"]*x.inter + xi["intercept"]
+              }
+              r.multi$m[i,c(7,8)] <- c(x.inter,y.inter)	
+            }
+            
+          }
+        }
       }
+        
       if(input$tabs=="late"){
         late$l <- rbind(late$l,unlist(input$plot_click))
-      }
-      
-    })
-    dim(imc)
+      }})
+
     observeEvent(input$plot_click2, {
       if(input$tabs=="corr"){
-        np <- nearPoints(r$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
-        r$m <- r$m[!np$selected_,]
+        if(input$cor_type == "single"){
+          np <- nearPoints(r$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
+          r$m <- r$m[!np$selected_,] 
+         }
+        if(input$cor_type == "multi"){
+          np <- nearPoints(r.multi$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
+          r.multi$m <- r.multi$m[!np$selected_,]
+          }
       }
       if(input$tabs=="late"){
         np <- nearPoints(late$l, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
@@ -689,9 +760,10 @@ require(imager)
       if(input$line_type == "sin"){sel$sel <- input$band_x1}
       if(input$line_type == "mul"){
         sel$sel <- band.sel(input$band_x1,input$band_xn,input$band_N)
+        show.band$sb <- input$show.band
       }
       smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha)
-    }
+     }
     )
     
     ## ring events ----------------------------------------------------------
@@ -700,18 +772,23 @@ require(imager)
       smooth_res <- smooth$res*(dim(imc)[1]/2/max(smooth$res))
       peak_res <- peaks(smooth_res[,1],input$score,input$join)
       r$m <- data.frame(x=input$band_x1, y=peak_res)
-    }
+     }
     )
     
     observeEvent(input$run_peak_multi,{
       smooth_res <- apply(smooth$res, 2, function(x){x*(dim(imc)[1]/2/max(x))})
       peaks.multi <- apply(smooth_res,2,peaks,input$score,input$join)
-
-      c.peak <- clus.peak.bands (peaks.multi, input$join.inter, sel$sel)
-      res <- rings.m(c.peak, input$p.threshold, sel$sel, 0.05)
-      r$m <- data.frame(x=res$x, y=res$y)
-      r.multi <- data.frame(x=res$x1, y=res$y1)
-      
+      c.peak$cp <- clus.peak.bands (peaks.multi, input$join.inter, sel$sel)
+      prob <- sapply(c.peak$cp,function(x)length(unique(names(x)))/length(sel$sel))
+      y <- sapply(c.peak$cp,mean)
+      p$pval <- data.frame(prob=prob,y=y)
+    })
+    
+    observeEvent(input$select_multi,{
+      res <- rings.m(c.peak$cp, input$prob, sel$sel, 0.05)
+      res$band_x1 <- input$band_x1
+      res$band_xn <- input$band_xn
+      r.multi$m <- res
     }
     )
     
@@ -722,19 +799,18 @@ require(imager)
        peak_res <- peaks(smooth_res[,1],input$score,input$join)
        r$m <- data.frame(x=input$band_x1, y=peak_res)
      })
+    
+    observeEvent(input$accept, {
+      r$m <- r$m[r$m$type!=2,]
+      r$m$type <- 4
+      r$m$plot <- T
+      r.multi$m <- r.multi$m[r.multi$m$type!=2,]
+      r.multi$m$type <- 4
+      r.multi$m$plot <- T
+    })
      
-
-    observeEvent(input$save_p, {
-      write.table(r$m,input$file_p,sep=" ",row.names=F)
-    })
-    
     ## late events ----------------------------------------------------------
-    
-    
-    observeEvent(input$save_late, {
-      write.table(cbind(r$m,late$l),input$file_late,row.names=F)
-      
-    })
+   
     
     observeEvent(input$run_late,{  
       late$l <- late.f (smooth$res, r$m)
@@ -751,14 +827,14 @@ require(imager)
       res <- r$m
       res <- res[order(res$y),]
       for(i in 1:(nrow(res)-1)){
-          res[i,3] <- dist(res[c(i,i+1),1:2])
+          res[i,4] <- dist(res[c(i,i+1),1:2])
       }
-      colnames(res)[3] <- "distance"
+      colnames(res)[4] <- "distance"
       write.table(res,input$file_dis_ring,row.names=F)
       }
     )
     
-    observeEvent(input$dis_late,{  
+    observeEvent(input$dis_late,{# OJO con la nueva corrección
       res <- cbind(r$m,late$l)
       colnames(res)[c(3,4)] <-  c("xl","yl")
       res <- res[order(res$y),]
@@ -782,9 +858,12 @@ require(imager)
 }
 
 
+### cargar datos
+
+imc <- load.image("02-data\\jaime_pino.png")
+
 rsize.per <- -10
 line.measured(imc,rsize.per)
-
 
 
 
