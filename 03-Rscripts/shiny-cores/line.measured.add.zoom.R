@@ -4,7 +4,6 @@ library(shiny)
 library(keys)
 
 
-dim(x)
 
 line.measured <- function(imc,rsize.per){
 require(imager)
@@ -100,6 +99,8 @@ require(imager)
                                       min = 1, 
                                       max = dim(imc)[1], 
                                       step = 1),
+                         textInput("sel.line", "Select line", 
+                                   value = "ALL"),
                            actionButton("run_smooth", "Run")),
                   tabPanel("Ring detection",value="score.p",
                            sliderInput("score","Score", min = round(slider.size,2), max = 0, round=-2,step=0.01,
@@ -128,8 +129,7 @@ require(imager)
                              inputId = "cor_type",
                              label = "Correction type",
                              choices = list("Single" = "single",
-                                            "Multi" = "multi")),
-                           actionButton("accept", "Accept changes")),
+                                            "Multi" = "multi"))),
                   tabPanel("Late wood", value="late",
                            actionButton("run_late", "Run"),
                            actionButton("rese_late", "Reset")),
@@ -389,6 +389,44 @@ require(imager)
       do.call(cbind,res)
     }
     
+    clever.smooth.interactive <- function(x, line, ldm, ldms, lum, lums,  alpha){
+       #x : ## matrix
+      #line : ## rv$m
+      #ldm : ## Heigh dwon mean
+      #ldms : ## width dwon mean
+      #lum : ## Heigh upper mean
+      #lums : ## width upper mean
+      #alpha : ## gaussian decay exponent (0 = no decay; 0> increase decay); plot(gaus_decay_w(1:100,alpha))
+      
+      line <- as.numeric(line)
+      res <- list()
+      x[x==0] <- 1e-10
+        #vertical margins
+        y0 <- line[2]
+        yf <- line[4]
+        
+        #gaussian weighs
+        th <- abs(0:(lums*2)-lums)
+        tv <- 0:lum
+        dis.up <- decay.gaus.2d(alpha, th, tv)
+        
+        th <- abs(0:(ldms*2)-ldms)
+        tv <- 0:ldm
+        dis.dwon <- decay.gaus.2d(alpha, th, tv)
+        
+        diff <- c()
+        for(j in y0:yf){
+          xj <- (-line[5] + j)/line[6]
+
+          upper.mean <- sum(x[(j-lum):j,(xj-lums):(xj+lums)]*dis.up)/sum(dis.up)
+          down.mean <- sum(x[j:(j+ldm),(xj-ldms):(xj+ldms)]*dis.dwon)/sum(dis.dwon)
+          diff[j] <- ((down.mean-upper.mean)/upper.mean)#+ down.mean*theta
+        }
+      diff[(j+1):nrow(x)] <- NA
+      diff
+
+    }
+    
     peaks <- function(x, score, join.dis){
       
       #x : vector where peaks are detected
@@ -526,20 +564,21 @@ require(imager)
 
 # reactive ----------------------------------------------------------------
  
-    rv = reactiveValues(m=data.frame(x1=NA,y1=NA,x2=NA,y2=NA))# OJO: empieza en NA
+    rv = reactiveValues(m=data.frame(x1=NA,y1=NA,x2=NA,y2=NA,int=NA,slo=NA))# OJO: empieza en NA
     r = reactiveValues(m=NULL)
     r.multi = reactiveValues(m=NULL)
     sf = reactiveValues(r=c(0))
     sel = reactiveValues(sel=c(NA))
-    ranges <- reactiveValues(x = NULL, y = NULL)
+    ranges = reactiveValues(x = NULL, y = NULL)
     smooth = reactiveValues(res = NULL)
     peak = reactiveValues(res = NULL)
     late = reactiveValues(l=NULL)
     show.band = reactiveValues(sb=1)
-    c.peak <- reactiveValues(cp=NULL)
-    p <- reactiveValues(pval=NULL)
+    c.peak = reactiveValues(cp=NULL)
+    p = reactiveValues(pval=NULL)
     num.click.cor = reactiveValues(r = c(0))
     data.cor.multi = reactiveValues(m = NULL)
+    smooth.int = reactiveValues(res = NULL)
     
 # plots -------------------------------------------------------------------
     
@@ -651,6 +690,12 @@ require(imager)
       }else{
         rv$m[nrow(rv$m),3] <- input$plot_click$x
         rv$m[nrow(rv$m),4] <- input$plot_click$y
+        #pendiente
+        m <-  (rv$m[nrow(rv$m),2]-rv$m[nrow(rv$m),4])/(rv$m[nrow(rv$m),1]-rv$m[nrow(rv$m),3])
+        #intercepto
+        rv$m[nrow(rv$m),5] <- rv$m[nrow(rv$m),2] - m * rv$m[nrow(rv$m),1] 
+        rv$m[nrow(rv$m),6] <- m
+        
         sf$r <- 0
       }}
       if(input$tabs=="corr"){
@@ -756,14 +801,21 @@ require(imager)
     ## smooth events ----------------------------------------------------------
     
     observeEvent(input$run_smooth,{  
-      if(input$line_type == "int"){sel$sel <- input$band_x1}
+      if(input$line_type == "int"){
+        if(input$sel.line=="ALL"){
+          #smooth.int$res <- do.call(cbind, 
+                                    apply(rv$m,1, function(y)clever.smooth.interactive(x,y,input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha))#)
+        }else{
+          smooth.int$res <- cbind(smooth.int$res, clever.smooth.interactive(x,rv$m[as.numeric(input$sel.line),],input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha))
+        }
+      }else{
       if(input$line_type == "sin"){sel$sel <- input$band_x1}
       if(input$line_type == "mul"){
         sel$sel <- band.sel(input$band_x1,input$band_xn,input$band_N)
         show.band$sb <- input$show.band
       }
       smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha)
-     }
+     }}
     )
     
     ## ring events ----------------------------------------------------------
@@ -860,7 +912,7 @@ require(imager)
 
 ### cargar datos
 
-imc <- load.image("02-data\\jaime_pino.png")
+imc <- load.image("02-data\\becacore.png")
 
 rsize.per <- -10
 line.measured(imc,rsize.per)
