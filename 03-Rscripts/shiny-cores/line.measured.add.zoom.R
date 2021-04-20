@@ -101,7 +101,8 @@ require(imager)
                                       step = 1),
                          textInput("sel.line", "Select line", 
                                    value = "ALL"),
-                           actionButton("run_smooth", "Run")),
+                           actionButton("run_smooth", "Run"),
+                           actionButton("save_kk", "save")),
                   tabPanel("Ring detection",value="score.p",
                            sliderInput("score","Score", min = round(slider.size,2), max = 0, round=-2,step=0.01,
                                        value = slider.size/2),
@@ -249,23 +250,23 @@ require(imager)
         if(is.null(r)){
           return(NULL)
         }
-        if(is.null(ranges$x) | is.null(ranges$y)){
+       
           par(bg="transparent")
-          if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/max(smooth$res[,show.band$sb])}
-          if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
-          plot(yp~xp,col=4,pch="",cex=1.5,
+          if(input$line_type!="int"){
+            if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/max(smooth$res[,show.band$sb])}
+            if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
+            plot(yp~xp,col=4,pch="",cex=1.5,
                yaxs="i", xaxs="i",
-               xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
-          lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
-        }else{
-          par(bg="transparent")
-          if(is.null(smooth$res)){gst=0} else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/max(smooth$res[,show.band$sb])}
-          if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
-          plot(yp~xp,col=4,pch="",cex=1.5,
-               yaxs="i", xaxs="i",
-               xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") # ylim: importante para que no le de la vuelta a la imagen al hacer zoom
-          lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
-        }
+               xlim=xli,  ylim = yli,xlab="",ylab="") 
+            lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
+          }else{
+            if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/max(x,na.rm=T))}
+            if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
+            plot(yp~xp,col=4,pch="",cex=1.5,
+                 yaxs="i", xaxs="i",
+                 xlim=xli,  ylim = yli,xlab="",ylab="") 
+            apply(gst,2,function(x)lines(x, 1:length(x),lwd=0.1,col="darkblue"))
+          }
       }
       if(input$tabs=="late"){ 
         if(is.null(r)){
@@ -417,7 +418,7 @@ require(imager)
         diff <- c()
         for(j in y0:yf){
           xj <- (-line[5] + j)/line[6]
-
+         
           upper.mean <- sum(x[(j-lum):j,(xj-lums):(xj+lums)]*dis.up)/sum(dis.up)
           down.mean <- sum(x[j:(j+ldm),(xj-ldms):(xj+ldms)]*dis.dwon)/sum(dis.dwon)
           diff[j] <- ((down.mean-upper.mean)/upper.mean)#+ down.mean*theta
@@ -684,18 +685,18 @@ require(imager)
     observeEvent(input$plot_click, {
       if(input$tabs=="line"){
       if(sf$r == 0){
-        rv$m[nrow(rv$m)+1,1] <- input$plot_click$x
-        rv$m[nrow(rv$m),2] <- input$plot_click$y
+        rv$m[nrow(rv$m)+1,1:2] <- unlist(input$plot_click)
         sf$r <- sf$r + 1
       }else{
-        rv$m[nrow(rv$m),3] <- input$plot_click$x
-        rv$m[nrow(rv$m),4] <- input$plot_click$y
+        rv$m[nrow(rv$m),3:4] <- unlist(input$plot_click)
         #pendiente
         m <-  (rv$m[nrow(rv$m),2]-rv$m[nrow(rv$m),4])/(rv$m[nrow(rv$m),1]-rv$m[nrow(rv$m),3])
         #intercepto
         rv$m[nrow(rv$m),5] <- rv$m[nrow(rv$m),2] - m * rv$m[nrow(rv$m),1] 
         rv$m[nrow(rv$m),6] <- m
-        
+        #OJO: esto es una guarrada
+        if(rv$m[nrow(rv$m),1]==rv$m[nrow(rv$m),3]){rv$m[nrow(rv$m),6] <- 1;rv$m[nrow(rv$m),5] <-0 }
+        rv$m <- rv$m[!is.na(rowSums(rv$m)),]
         sf$r <- 0
       }}
       if(input$tabs=="corr"){
@@ -780,6 +781,10 @@ require(imager)
       }}
     })
     
+    observeEvent(input$save_kk, {
+     write.csv(smooth.int$res,file="beca_toca_pelotas.csv")
+    })
+    
     # observeEvent(input$undo_key, {
     #   if(input$tabs=="line"){
     #   if(nrow(rv$m)>0){
@@ -803,8 +808,7 @@ require(imager)
     observeEvent(input$run_smooth,{  
       if(input$line_type == "int"){
         if(input$sel.line=="ALL"){
-          #smooth.int$res <- do.call(cbind, 
-                                    apply(rv$m,1, function(y)clever.smooth.interactive(x,y,input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha))#)
+          smooth.int$res <- apply(rv$m,1, function(y)clever.smooth.interactive(x,y,input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha))
         }else{
           smooth.int$res <- cbind(smooth.int$res, clever.smooth.interactive(x,rv$m[as.numeric(input$sel.line),],input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha))
         }
