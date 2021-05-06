@@ -99,9 +99,7 @@ require(imager)
                                       min = 1, 
                                       max = dim(imc)[1], 
                                       step = 1),
-                         textInput("sel.line", "Select line", 
-                                   value = "ALL"),
-                           actionButton("run_smooth", "Run"),
+                               actionButton("run_smooth", "Run"),
                            actionButton("save_kk", "save")),
                   tabPanel("Ring detection",value="score.p",
                            sliderInput("score","Score", min = round(slider.size,2), max = 0, round=-2,step=0.01,
@@ -118,6 +116,7 @@ require(imager)
                                         min = 1, 
                                         max = dim(imc)[2], 
                                         step = 1),
+                           actionButton("run_peak_int", "Detect interactive"),
                            actionButton("run_peak_single", "Detect single"),
                            actionButton("run_peak_multi", "Detect multi"),
                            sliderInput("prob","Probability", min = 0, max = 1, round=-2,step=0.01,
@@ -129,7 +128,8 @@ require(imager)
                            radioButtons(
                              inputId = "cor_type",
                              label = "Correction type",
-                             choices = list("Single" = "single",
+                             choices = list("Single/Interactive" = "single",
+                                            "Interactive overlap" = "over",
                                             "Multi" = "multi"))),
                   tabPanel("Late wood", value="late",
                            actionButton("run_late", "Run"),
@@ -218,6 +218,11 @@ require(imager)
             apply(r.multi$m,1,function(x)segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1))
             points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,col=4)
         }
+        if(input$cor_type == "over"){     
+              plot(r$m$y~r$m$x,pch=3,cex=1.5,col=r$m$pair+1,
+               yaxs="i", xaxs="i",
+               xlim=xli ,ylim=yli,xlab="",ylab="")
+        }
       }      
       if(input$tabs=="score.p"){
 
@@ -232,6 +237,17 @@ require(imager)
                lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
                abline(v=input$score)
           }
+        
+        if(input$line_type=="int"){
+          if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/max(x,na.rm=T))}
+          if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
+          plot(yp~xp,col=4,pch=3,cex=1.5,
+               yaxs="i", xaxs="i",
+               xlim=xli,  ylim = yli,xlab="",ylab="") 
+          apply(gst,2,function(x)lines(x, 1:length(x),lwd=0.1,col="darkblue"))
+          abline(v=input$score)
+          }
+        
         if(input$line_type=="mul"){
           if(is.null(r.multi$m)){yp <- xp <- -1}else{yp <- r.multi$m$y; xp <- r.multi$m$x}
           if(is.null(p$pval)){prob=dim(imc)[1];y=0}else{prob=p$pval$prob*dim(imc)[1]+dim(imc)[1];y<-p$pval$y}
@@ -253,20 +269,21 @@ require(imager)
        
           par(bg="transparent")
           if(input$line_type!="int"){
-            if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/max(smooth$res[,show.band$sb])}
+            if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/max(smooth$res[,show.band$sb],na.rm=T)}
             if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
             plot(yp~xp,col=4,pch="",cex=1.5,
                yaxs="i", xaxs="i",
                xlim=xli,  ylim = yli,xlab="",ylab="") 
             lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
-          }else{
-            if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/max(x,na.rm=T))}
-            if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
-            plot(yp~xp,col=4,pch="",cex=1.5,
-                 yaxs="i", xaxs="i",
-                 xlim=xli,  ylim = yli,xlab="",ylab="") 
-            apply(gst,2,function(x)lines(x, 1:length(x),lwd=0.1,col="darkblue"))
           }
+           else{
+            if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/max(x,na.rm=T))}
+             if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
+             plot(yp~xp,col=4,pch="",cex=1.5,
+                  yaxs="i", xaxs="i",
+                  xlim=xli,  ylim = yli,xlab="",ylab="")
+             apply(gst,2,function(x)lines(x, 1:length(x),lwd=0.1,col="darkblue"))
+         }
       }
       if(input$tabs=="late"){ 
         if(is.null(r)){
@@ -357,30 +374,31 @@ require(imager)
       res <- list()
       x[x==0] <- 1e-10
       for(i in sel){
-        #horizontal margins # OJO: si nos pasamos con el area de smooth
-        #if(i<(ldms+1)){ldms <- ldms+(i-(ldms+1))}
-        #if(ncol(x)< i+(ldms+1)){ldms <- ldms+(ncol(x)-(ldms+1))}
-        #if(i-(lums+1)<0){lums <- lums+(i-(lums+1))}
-        #if(ncol(x)< i+(lums+1)){lums <- lums+(ncol(x)-(lums+1))}
-        
+
         #vertical margins
         y0 <- (lum+1)
         yf <- (nrow(x)-(ldm+1))
         
-        #gaussian weighs
-        th <- abs(0:(lums*2)-lums)
-        tv <- 0:lum
-        dis.up <- decay.gaus.2d(alpha, th, tv)
+        # #gaussian weighs
+        # th <- abs(0:(lums*2)-lums)
+        # tv <- 0:lum
+        # dis.up <- decay.gaus.2d(alpha, th, tv)
+        # 
+        # th <- abs(0:(ldms*2)-ldms)
+        # tv <- 0:ldm
+        # dis.dwon <- decay.gaus.2d(alpha, th, tv)
         
-        th <- abs(0:(ldms*2)-ldms)
-        tv <- 0:ldm
-        dis.dwon <- decay.gaus.2d(alpha, th, tv)
-        
+
+        if( i-lums <1){ul = i-1}else{ul = lums}
+        if( i+lums > ncol(x)){ur = ncol(x)-i}else{ur = lums}
+        if( i-ldms <1){dl = i-1}else{dl = ldms}
+        if( i+ldms > ncol(x)){dr = ncol(x)-i}else{dr = ldms}
+
         diff <- c()
         diff[1:y0] <- 0
         for(j in y0:yf){
-          upper.mean <- sum(x[(j-lum):j,(i-lums):(i+lums)]*dis.up)/sum(dis.up)
-          down.mean <- sum(x[j:(j+ldm),(i-ldms):(i+ldms)]*dis.dwon)/sum(dis.dwon)
+          upper.mean <- sum(x[(j-lum):j,(i-ul):(i+ur)]) #sum(x[(j-lum):j,(i-ul):(i+ur)]*dis.up)/sum(dis.up)
+          down.mean <- sum(x[j:(j+ldm),(i-dl):(i+dr)]) #sum(x[j:(j+ldm),(i-dl):(i+dr)]*dis.dwon)/sum(dis.dwon)
           diff[j] <- ((down.mean-upper.mean)/upper.mean)#+ down.mean*theta
         }
         diff[(j+1):nrow(x)] <- 0
@@ -388,10 +406,11 @@ require(imager)
       }
       names(res) <- sel
       do.call(cbind,res)
+      
     }
     
     clever.smooth.interactive <- function(x, line, ldm, ldms, lum, lums,  alpha){
-       #x : ## matrix
+      #x : ## matrix
       #line : ## rv$m
       #ldm : ## Heigh dwon mean
       #ldms : ## width dwon mean
@@ -403,29 +422,41 @@ require(imager)
       res <- list()
       x[x==0] <- 1e-10
         #vertical margins
-        y0 <- line[2]
-        yf <- line[4]
+        if(line[2]<line[4]){y0=line[2];yf=line[4]}else{y0=line[4];yf=line[2]}
+      
+        if(yf>nrow(x)){yf = nrow(x)}
+        if(y0<1){y0 = 1}
+      
+        # #gaussian weighs
+        # th <- abs(0:(lums*2)-lums)
+        # tv <- 0:lum
+        # dis.up <- decay.gaus.2d(alpha, th, tv)
+        # 
+        # th <- abs(0:(ldms*2)-ldms)
+        # tv <- 0:ldm
+        # dis.dwon <- decay.gaus.2d(alpha, th, tv)
         
-        #gaussian weighs
-        th <- abs(0:(lums*2)-lums)
-        tv <- 0:lum
-        dis.up <- decay.gaus.2d(alpha, th, tv)
-        
-        th <- abs(0:(ldms*2)-ldms)
-        tv <- 0:ldm
-        dis.dwon <- decay.gaus.2d(alpha, th, tv)
-        
+        xs <- c()
         diff <- c()
         for(j in y0:yf){
-          xj <- (-line[5] + j)/line[6]
+          xj <- xs[j] <- (-line[5] + j)/line[6]
          
-          upper.mean <- sum(x[(j-lum):j,(xj-lums):(xj+lums)]*dis.up)/sum(dis.up)
-          down.mean <- sum(x[j:(j+ldm),(xj-ldms):(xj+ldms)]*dis.dwon)/sum(dis.dwon)
-          diff[j] <- ((down.mean-upper.mean)/upper.mean)#+ down.mean*theta
+          if(xj<1 | xj>ncol(x)){diff <- xs <- NA}else{
+            if( j-lum <1){up = j-1}else{up = lum}
+            if( xj-lums <1){ul = xj-1}else{ul = lums}
+            if( xj+lums > ncol(x)){ur = ncol(x)-xj}else{ur = lums}
+            if( j + ldm > nrow(x)){dw = nrow(x)-j}else{dw = ldm}
+            if( xj-ldms <1){dl = xj-1}else{dl = ldms}
+            if( xj+ldms > ncol(x)){dr = ncol(x)-xj}else{dr = ldms}
+          
+            upper.mean <- sum(x[(j-up):j,(xj-ul):(xj+ur)]) #sum(x[(j-up):j,(xj-ul):(xj+lums)]*dis.up)/sum(dis.up)
+            down.mean  <- sum(x[j:(j+dw),(xj-dl):(xj+dr)]) #sum(x[j:(j+dw),(xj-dl):(xj+dr)]*dis.dwon)/sum(dis.dwon)
+            diff[j] <- ((down.mean-upper.mean)/upper.mean) #+ down.mean*theta
+          }
         }
       diff[(j+1):nrow(x)] <- NA
-      diff
-
+      xs[(j+1):nrow(x)] <- NA
+      list(diff,xs)
     }
     
     peaks <- function(x, score, join.dis){
@@ -580,6 +611,8 @@ require(imager)
     num.click.cor = reactiveValues(r = c(0))
     data.cor.multi = reactiveValues(m = NULL)
     smooth.int = reactiveValues(res = NULL)
+    smooth.int.x = reactiveValues(res = NULL)
+    over = reactiveValues(m = NULL)
     
 # plots -------------------------------------------------------------------
     
@@ -633,8 +666,8 @@ require(imager)
         ranges$y = c(0,dim(imc)[2])
       }else{
         ran <- (ranges$x[2]-ranges$x[1])
-        ranges$x[1] <- ranges$x[1]+ran -(ran*0.5)
-        ranges$x[2] <- ranges$x[2]+ran -(ran*0.5)
+        ranges$x[1] <- ranges$x[1]+ran -(ran*0.8)
+        ranges$x[2] <- ranges$x[2]+ran -(ran*0.8)
         
       }
     })
@@ -645,8 +678,8 @@ require(imager)
         ranges$y = c(0,dim(imc)[2])
       }else{
         ran <- (ranges$x[2]-ranges$x[1])
-        ranges$x[1] <- ranges$x[1]-ran +(ran*0.5)
-        ranges$x[2] <- ranges$x[2]-ran +(ran*0.5)
+        ranges$x[1] <- ranges$x[1]-ran +(ran*0.8)
+        ranges$x[2] <- ranges$x[2]-ran +(ran*0.8)
       }
     })
     
@@ -701,9 +734,19 @@ require(imager)
       }}
       if(input$tabs=="corr"){
         if(input$cor_type == "single"){
-          r$m <- rbind(r$m,unlist(input$plot_click))
+          r$m <- rbind(r$m,c(unlist(input$plot_click),0))
           r$m <- r$m[order(r$m$y),]
         }
+        if(input$cor_type == "over"){
+          if(num.click.cor$r == 0){
+            np <- nearPoints(r$m, input$plot_click, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
+            r$m$pair[np$selected_] <-  max(r$m$pair)+1
+            num.click.cor$r <- 1
+          }else{
+            np <- nearPoints(r$m, input$plot_click, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
+            r$m$pair[np$selected_] <-  max(r$m$pair)
+            num.click.cor$r <- 0
+        }}
         if(input$cor_type == "multi"){
           if(num.click.cor$r == 0){
             data.cor.multi$m <- unlist(input$plot_click)
@@ -782,7 +825,7 @@ require(imager)
     })
     
     observeEvent(input$save_kk, {
-     write.csv(smooth.int$res,file="beca_toca_pelotas.csv")
+     write.csv(r$m,file="beca_toca_pelotas.csv")
     })
     
     # observeEvent(input$undo_key, {
@@ -805,31 +848,56 @@ require(imager)
     
     ## smooth events ----------------------------------------------------------
     
-    observeEvent(input$run_smooth,{  
+    observeEvent(input$run_smooth,{
+
       if(input$line_type == "int"){
-        if(input$sel.line=="ALL"){
-          smooth.int$res <- apply(rv$m,1, function(y)clever.smooth.interactive(x,y,input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha))
-        }else{
-          smooth.int$res <- cbind(smooth.int$res, clever.smooth.interactive(x,rv$m[as.numeric(input$sel.line),],input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha))
-        }
+          smooth_int <- apply(rv$m,1, function(y)clever.smooth.interactive(x,y,input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha))
+          smooth.int$res <- sapply(smooth_int,function(x)x[[1]])
+          smooth.int.x$res <- sapply(smooth_int,function(x)x[[2]])
       }else{
-      if(input$line_type == "sin"){sel$sel <- input$band_x1}
-      if(input$line_type == "mul"){
-        sel$sel <- band.sel(input$band_x1,input$band_xn,input$band_N)
-        show.band$sb <- input$show.band
+      if(input$line_type == "sin"){ 
+        
+        if(input$band_x1 > ncol(x) | input$band_x1<=0){showNotification("Initial band out of core",type="error")
+        }else{
+          sel$sel <- input$band_x1
+          smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha)
+          }
+    
       }
-      smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha)
+      if(input$line_type == "mul"){
+        
+        show.band$sb <- input$show.band
+        
+        
+         if(input$band_x1 > ncol(x) | input$band_x1<=0 | input$band_xn > ncol(x)| input$band_xn<=0){showNotification("Bands out of core",type="error")
+         }else{
+           sel$sel <- band.sel(input$band_x1,input$band_xn,input$band_N)
+           smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha)
+           }
+      }
      }}
     )
     
     ## ring events ----------------------------------------------------------
     
     observeEvent(input$run_peak_single,{  
-      smooth_res <- smooth$res*(dim(imc)[1]/2/max(smooth$res))
+      smooth_res <- smooth$res*(dim(imc)[1]/2/max(smooth$res,na.rm=T))
       peak_res <- peaks(smooth_res[,1],input$score,input$join)
-      r$m <- data.frame(x=input$band_x1, y=peak_res)
+      r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0)
      }
     )
+    
+    observeEvent(input$run_peak_int,{  
+      smooth_res <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/max(x,na.rm=T))
+      peak_res <-apply(smooth_res,2,peaks,input$score,input$join)
+      xs <- c()
+      for(i in 1:length(peak_res)){
+        xs <- c(xs,smooth.int.x$res[peak_res[[i]],i])
+      }
+      r$m <- data.frame(x=xs, y=unlist(peak_res), pair=0)
+    }
+    )
+    
     
     observeEvent(input$run_peak_multi,{
       smooth_res <- apply(smooth$res, 2, function(x){x*(dim(imc)[1]/2/max(x))})
@@ -853,22 +921,16 @@ require(imager)
      observeEvent(input$rese, {
        smooth_res <- smooth$res*(dim(imc)[1]/2/max(smooth$res))
        peak_res <- peaks(smooth_res[,1],input$score,input$join)
-       r$m <- data.frame(x=input$band_x1, y=peak_res)
+       r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0)
      })
     
-    observeEvent(input$accept, {
-      r$m <- r$m[r$m$type!=2,]
-      r$m$type <- 4
-      r$m$plot <- T
-      r.multi$m <- r.multi$m[r.multi$m$type!=2,]
-      r.multi$m$type <- 4
-      r.multi$m$plot <- T
-    })
+    
+
      
     ## late events ----------------------------------------------------------
    
     
-    observeEvent(input$run_late,{  
+    observeEvent(input$run_late,{  # sino funciona el por el r$m$pair
       late$l <- late.f (smooth$res, r$m)
     }
     )
@@ -917,7 +979,6 @@ require(imager)
 ### cargar datos
 
 imc <- load.image("02-data\\becacore.png")
-
 rsize.per <- -10
 line.measured(imc,rsize.per)
 
