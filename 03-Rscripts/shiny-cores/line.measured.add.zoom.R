@@ -17,7 +17,7 @@ require(imager)
   
   ui <- fluidPage(
     useKeys(),
-    titlePanel("Tree ring enlightened examination - TREE"),
+    titlePanel("tring"),
     
     
     sidebarLayout(
@@ -136,6 +136,20 @@ require(imager)
                            actionButton("run_late", "Run"),
                            actionButton("rese_late", "Reset")),
                   tabPanel("Measures", value="measure",
+                           radioButtons(
+                             inputId = "save_type",
+                             label = "Save type",
+                           choices = list("Single" = "single",
+                                          "Interactive" = "int",
+                                          "Multi" = "multi")),
+                           numericInput(inputId = "year", 
+                                        label = "Final year", 
+                                        value = NA,
+                                        step = 1),
+                           numericInput(inputId = "ppp", 
+                                        label = "Image resolution (ppp)", 
+                                        value = NA,
+                                        step = 1),
                            textInput("file_dis_ring", "Compute and save distances between rings", value = "distance_ring.csv"),
                            actionButton("dis_ring", "Run & save"),
                            textInput("file_dis_late", "Compute and save distances between ring parts", value = "distance_parts.csv"),
@@ -332,12 +346,12 @@ require(imager)
 
         par(bg="transparent")
         
-        if(input$cor_type == "single"){        
+        if(input$save_type %in% c("single","int")){        
           plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
         }
-        if(input$cor_type == "multi"){
+        if(input$save_type == "multi"){
           plot(r.multi$m$y~r.multi$m$x,pch="",cex=1.5,
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
@@ -918,6 +932,7 @@ require(imager)
     observeEvent(input$run_peak_int,{  
       smooth_res <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,0.95,na.rm=T))
       peak_res <-apply(smooth_res,2,peaks,input$score,input$join)
+      if(!is.list(peak_res)) {peak_res <- list(peak_res)}
       xs <- c()
       for(i in 1:length(peak_res)){
         xs <- c(xs,smooth.int.x$res[peak_res[[i]],i])
@@ -969,7 +984,7 @@ require(imager)
     ## measures events ----------------------------------------------------------
     
     observeEvent(input$dis_ring,{
-      if(is.null(rv$m)){
+      if(input$save_type!="multi"){
         if(sum(r$m$pair)==0){
          res <- r$m
          res <- res[order(res$y),]
@@ -1004,28 +1019,39 @@ require(imager)
         
         res <- do.call(rbind,res.l[order(sapply(res.l,min))])
         }
-        write.table(res,input$file_dis_ring,row.names=F)
         
-      }
+      }else{
+        res <- r.multi$m
+        res <- data.frame(res[order(res$y),])
+        res$distance<- apply(res,1,function(x)sqrt((x[5]-x[7])^2+(x[6]-x[8])^2))
+        }
+      res$year <- input$year-c(1:nrow(res)-1)
+      res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
+      write.table(res,input$file_dis_ring,row.names=F)
       
-      }
-      
-    )
+      })
     
-    observeEvent(input$dis_late,{# OJO con la nueva corrección
-      res <- cbind(r$m,late$l)
-      colnames(res)[c(3,4)] <-  c("xl","yl")
+    observeEvent(input$dis_late,{
+      if(input$save_type=="single"){
+      colnames(late$l) <- c("xl","yl")
+      res <- data.frame(cbind(r$m,late$l))
       res <- res[order(res$y),]
       for(i in 1:(nrow(res)-1)){
-        res[i,5] <- dist(res[c(i,i+1),1:2])
-        late.i <- res[i,3:4]; colnames(late.i)<- c("x","y")
-        early.i <- res[i+1,1:2]; colnames(early.i)<- c("x","y")
-        res[i,6] <- dist(rbind(late.i,early.i))
+        res$ring[i] <- dist(res[c(i,i+1),c("x","y")])
+        late.i <- res[i,c("xl","yl")]; colnames(late.i)<- c("x","y")
+        early.i <- res[i+1,c("x","y")]; colnames(early.i)<- c("x","y")
+        res$early[i] <- dist(rbind(late.i,early.i))
       }
-      res[,7] <- apply(res,1,function(x)dist(rbind(c(x[1],x[2]),c(x[3],x[4]))))
+      res$late <- apply(res,1,function(x)dist(rbind(x[c("x","y")],x[c("xl","yl")])))
+      res$year <- input$year-c(1:nrow(res)-1)
       
-      colnames(res)[c(5,6,7)] <- c("ring","early","late")
+      res[,"ring(cm)"] <- (res$ring/input$ppp)*2.54
+      res[,"early(cm)"] <- (res$early/input$ppp)*2.54
+      res[,"late(cm)"] <- (res$late/input$ppp)*2.54
+
       write.table(res,input$file_dis_late,row.names=F)
+      }else{showNotification("Sorry only implemented for single type", duration = 10, type="error")}
+      
     }
     )
     
