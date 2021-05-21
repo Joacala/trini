@@ -13,7 +13,7 @@ require(imager)
   x <- grayscale(imc, method = "Luma", drop = TRUE)
   x <- t(channels(x, drop = T)[[1]])
   slider.size <- (min(x)-max(x))*(dim(imc)[1]/2/max(x))
-
+  time.c <- Sys.time()
   
   ui <- fluidPage(
     useKeys(),
@@ -53,7 +53,8 @@ require(imager)
     ),
     sidebarPanel(
       tabsetPanel(id="tabs",
-                  
+                  # tabPanel("Load data",value="load_data",
+                  #          actionButton("start_time", "Start Measure time")),
                   tabPanel("Line measured",value="line",
                            actionButton("undo", "Undo")),
                   tabPanel("Smoothing",value="smooth",
@@ -102,7 +103,7 @@ require(imager)
                                actionButton("run_smooth", "Run"),
                            actionButton("save_kk", "save")),
                   tabPanel("Ring detection",value="score.p",
-                           sliderInput("score","Score", min = round(slider.size,2), max = 0, round=-2,step=0.01,
+                           sliderInput("score","Score", min = round(slider.size+(0.1*slider.size),2), max = 0, round=-2,step=0.01,
                                        value = slider.size/2),
                            numericInput(inputId = "join", 
                                         label = "Merge", 
@@ -174,14 +175,13 @@ require(imager)
 # functions ---------------------------------------------------------------
 
     app.plot.img <- function(imc){
-       if(is.null(imc)){
-        return(NULL)
-      }
-      if(is.null(ranges$x) | is.null(ranges$y)){
-        plot(imc ,xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),asp="varying")
-      }else{
+       if(input$tabs!="load_data" | !is.null(imc)){
+        if(is.null(ranges$x) | is.null(ranges$y)){
+          plot(imc ,xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),asp="varying")
+        }else{
         plot(imc, xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),asp="varying")
-      }
+        }
+       }
     }
   
     app.plot.sct <- function(rv){
@@ -633,6 +633,9 @@ require(imager)
     smooth.int = reactiveValues(res = NULL)
     smooth.int.x = reactiveValues(res = NULL)
     over = reactiveValues(m = NULL)
+    # time = reactiveValues(t = c())
+    click.count <- reactiveValues(cc = c(0))
+    click.count2 <- reactiveValues(cc2 = c(0))
     
 # plots -------------------------------------------------------------------
     
@@ -645,8 +648,9 @@ require(imager)
     })
     
     output$plot3 <- renderPlot({
-      plot(im,xlim=c(dim(im)[2]/2*-1,dim(im)[2]/2),ylim=c(dim(im)[2],0),asp="varying")
-      rect(ranges$x[1]/abs(rsize.per), ranges$y[2]/abs(rsize.per), ranges$x[2]/abs(rsize.per), ranges$y[1]/abs(rsize.per))
+      if(input$tabs!="load_data"){
+        plot(im,xlim=c(dim(im)[2]/2*-1,dim(im)[2]/2),ylim=c(dim(im)[2],0),asp="varying")
+      }
     })
     
     
@@ -655,8 +659,10 @@ require(imager)
     ## plot management ----------------------------------------------------------
     
     observeEvent(input$plot1_brush, {
-      ranges$x <- c(input$plot1_brush$xmin * abs(rsize.per), input$plot1_brush$xmax * abs(rsize.per))
-      ranges$y <- c(input$plot1_brush$ymin * abs(rsize.per), input$plot1_brush$ymax * abs(rsize.per))
+      if(input$tabs!="load_data"){
+        ranges$x <- c(input$plot1_brush$xmin * abs(rsize.per), input$plot1_brush$xmax * abs(rsize.per))
+        ranges$y <- c(input$plot1_brush$ymin * abs(rsize.per), input$plot1_brush$ymax * abs(rsize.per))
+      }
     })
     
     observeEvent(input$up,{
@@ -754,6 +760,7 @@ require(imager)
       }}
       if(input$tabs=="corr"){
         if(input$cor_type == "single"){
+          click.count$cc <- click.count$cc + 1
           r$m[nrow(r$m)+1,1] <- input$plot_click$x
           r$m[nrow(r$m),2] <- input$plot_click$y
           r$m[nrow(r$m),3] <- 0
@@ -790,7 +797,7 @@ require(imager)
             num.click.cor$r <- 1
           }else{
             num.click.cor$r <- 0
-            
+            click.count$cc <- click.count$cc + 1
             data.cor.multi$m <- rbind(data.cor.multi$m,unlist(input$plot_click))
             
             #pendiente
@@ -834,10 +841,12 @@ require(imager)
     observeEvent(input$plot_click2, {
       if(input$tabs=="corr"){
         if(input$cor_type %in% c("int","single")){
+          click.count2$cc2 <- click.count2$cc2+1
           np <- nearPoints(r$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
           r$m <- r$m[!np$selected_,] 
          }
         if(input$cor_type == "multi"){
+          click.count2$cc2 <- click.count2$cc2+1
           np <- nearPoints(r.multi$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
           r.multi$m <- r.multi$m[!np$selected_,]
         }
@@ -957,7 +966,7 @@ require(imager)
       r.multi$m <- res
     }
     )
-    
+    NULL+1
     ## correction events ----------------------------------------------------------
     
      observeEvent(input$rese, {
@@ -984,6 +993,7 @@ require(imager)
     ## measures events ----------------------------------------------------------
     
     observeEvent(input$dis_ring,{
+      capture.output(c(Sys.time()-time.c,click.count$cc,click.count2$cc2),file=paste("time_",input$file_dis_ring,sep=""))
       if(input$save_type!="multi"){
         if(sum(r$m$pair)==0){
          res <- r$m
@@ -1055,12 +1065,15 @@ require(imager)
     }
     )
     
+    # observeEvent(input$start_time,{time$t <- Sys.time()})
+
+    
+    
   }
 
   shinyApp(ui, server)
   
 }
-
 
 ### cargar datos
 
