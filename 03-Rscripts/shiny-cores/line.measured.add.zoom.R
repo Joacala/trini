@@ -12,6 +12,8 @@ require(imager)
   imc <- flatten.alpha(imc, bg = "white")# solo para png4
   x <- grayscale(imc, method = "Luma", drop = TRUE)
   x <- t(channels(x, drop = T)[[1]])
+  #x <- x[c((nrow(x)-50):nrow(x)),]#para borrar
+  qs <- 1
   slider.size <- (min(x)-max(x))*(dim(imc)[1]/2/max(x))
   time.c <- Sys.time()
   
@@ -94,6 +96,12 @@ require(imager)
                          #                min = 0, 
                          #                max = 100, 
                          #                step = 1),
+                         numericInput(inputId = "qv", 
+                                      label = "smooth visualization", 
+                                      value = 0.95,
+                                      min = 0.1, 
+                                      max = 1, 
+                                      step = 0.01),
                          numericInput(inputId = "show.band", 
                                       label = "Show band (if multi)", 
                                       value = 1,
@@ -111,12 +119,12 @@ require(imager)
                                         min = 1, 
                                         max = dim(imc)[2], 
                                         step = 1),
-                           numericInput(inputId = "join.inter", 
-                                        label = "Cluster resolution", 
-                                        value = 10,
-                                        min = 1, 
-                                        max = dim(imc)[2], 
-                                        step = 1),
+                           # numericInput(inputId = "join.inter", 
+                           #              label = "Cluster resolution", 
+                           #              value = 10,
+                           #              min = 1, 
+                           #              max = dim(imc)[2], 
+                           #              step = 1),
                            actionButton("run_peak_int", "Detect interactive"),
                            actionButton("run_peak_single", "Detect single"),
                            actionButton("run_peak_multi", "Detect multi"),
@@ -247,7 +255,7 @@ require(imager)
       if(input$tabs=="score.p"){
 
           par(bg="transparent")
-          if(is.null(smooth$res)){gst=0} else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/quantile(smooth$res[,show.band$sb],0.95)}
+          if(is.null(smooth$res)){gst=0} else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/quantile(smooth$res[,show.band$sb],input$qv)}
    
           if(input$line_type=="sin"){
            if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
@@ -259,7 +267,7 @@ require(imager)
           }
         
         if(input$line_type=="int"){
-          if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,0.95,na.rm=T))}
+          if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,input$qv,na.rm=T))}
           if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
           plot(yp~xp,col=4,pch=3,cex=1.5,
                yaxs="i", xaxs="i",
@@ -289,7 +297,7 @@ require(imager)
        
           par(bg="transparent")
           if(input$line_type!="int"){
-            if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/quantile(smooth$res[,show.band$sb],0.95,na.rm=T)}
+            if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/quantile(smooth$res[,show.band$sb],input$qv,na.rm=T)}
             if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
             plot(yp~xp,col=4,pch="",cex=1.5,
                yaxs="i", xaxs="i",
@@ -297,7 +305,7 @@ require(imager)
             lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
           }
            else{
-            if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,0.95,na.rm=T))}
+            if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,input$qv,na.rm=T))}
              if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
              plot(yp~xp,col=4,pch="",cex=1.5,
                   yaxs="i", xaxs="i",
@@ -417,8 +425,8 @@ require(imager)
         diff <- c()
         diff[1:y0] <- 0
         for(j in y0:yf){
-          upper.mean <- sum(x[(j-lum):j,(i-ul):(i+ur)]) #sum(x[(j-lum):j,(i-ul):(i+ur)]*dis.up)/sum(dis.up)
-          down.mean <- sum(x[j:(j+ldm),(i-dl):(i+dr)]) #sum(x[j:(j+ldm),(i-dl):(i+dr)]*dis.dwon)/sum(dis.dwon)
+          upper.mean <- mean(x[(j-lum):j,(i-ul):(i+ur)]) #sum(x[(j-lum):j,(i-ul):(i+ur)]*dis.up)/sum(dis.up)
+          down.mean <- mean(x[j:(j+ldm),(i-dl):(i+dr)]) #sum(x[j:(j+ldm),(i-dl):(i+dr)]*dis.dwon)/sum(dis.dwon)
           diff[j] <- ((down.mean-upper.mean)/upper.mean)#+ down.mean*theta
         }
         diff[(j+1):nrow(x)] <- 0
@@ -932,14 +940,14 @@ require(imager)
     ## ring events ----------------------------------------------------------
     
     observeEvent(input$run_peak_single,{  
-      smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,0.95,na.rm=T))
+      smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,input$qv,na.rm=T))
       peak_res <- peaks(smooth_res[,1],input$score,input$join)
       r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0, line=0)
      }
     )
     
     observeEvent(input$run_peak_int,{  
-      smooth_res <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,0.95,na.rm=T))
+      smooth_res <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,input$qv,na.rm=T))
       peak_res <-apply(smooth_res,2,peaks,input$score,input$join)
       if(!is.list(peak_res)) {peak_res <- list(peak_res)}
       xs <- c()
@@ -951,9 +959,9 @@ require(imager)
     )
 
     observeEvent(input$run_peak_multi,{
-      smooth_res <- apply(smooth$res, 2, function(x){x*(dim(imc)[1]/2/quantile(x,0.95))})
+      smooth_res <- apply(smooth$res, 2, function(x){x*(dim(imc)[1]/2/quantile(x,input$qv))})
       peaks.multi <- apply(smooth_res,2,peaks,input$score,input$join)
-      c.peak$cp <- clus.peak.bands (peaks.multi, input$join.inter, sel$sel)
+      c.peak$cp <- clus.peak.bands (peaks.multi, input$join, sel$sel)
       prob <- sapply(c.peak$cp,function(x)length(unique(names(x)))/length(sel$sel))
       y <- sapply(c.peak$cp,mean)
       p$pval <- data.frame(prob=prob,y=y)
@@ -970,7 +978,7 @@ require(imager)
     ## correction events ----------------------------------------------------------
     
      observeEvent(input$rese, {
-       smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,0.95))
+       smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,input$qv))
        peak_res <- peaks(smooth_res[,1],input$score,input$join)
        r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0)
      })
@@ -1077,7 +1085,7 @@ require(imager)
 
 ### cargar datos
 
-imc <- load.image("02-data\\becacore.png")
+imc <- load.image("02-data\\bec_tune.jpeg")
 rsize.per <- -10
 line.measured(imc,rsize.per)
 
