@@ -819,13 +819,14 @@ require(imager)
             y.center <- b +  m * x.center
             pendendicular.slope <- -1/m
             new.inter <- y.center - (-1/m) * x.center
-            r.multi$m[nrow(r.multi$m)+1,c(1:6,9:10)] <- c(b,m,new.inter,pendendicular.slope,x.center,y.center,data.cor.multi$m[1,1],data.cor.multi$m[2,1])
+            r.multi$m[nrow(r.multi$m)+1,c(1:6,9:11)] <- c(b,m,new.inter,pendendicular.slope,x.center,y.center,data.cor.multi$m[1,1],data.cor.multi$m[2,1],NA)
 
             # interseccion
             r.multi$m <- r.multi$m[order(r.multi$m$y),]
             NAs <- which(is.na(r.multi$m[,7]))
+            NAs <- NAs[NAs!=nrow(r.multi$m)]
             
-            for(i in (NAs-1):NAs){
+            for(i in NAs){
               x0 <-r.multi$m[i,]
               xi <- r.multi$m[i+1,]
               if(x0["slope"]==0){
@@ -942,7 +943,7 @@ require(imager)
     observeEvent(input$run_peak_single,{  
       smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,input$qv,na.rm=T))
       peak_res <- peaks(smooth_res[,1],input$score,input$join)
-      r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0, line=0)
+      r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0, line=0, type=1)
      }
     )
     
@@ -954,7 +955,7 @@ require(imager)
       for(i in 1:length(peak_res)){
         xs <- c(xs,smooth.int.x$res[peak_res[[i]],i])
       }
-      r$m <- data.frame(x=xs, y=unlist(peak_res), pair=0,line=rep(1:length(peak_res),sapply(peak_res,length)))
+      r$m <- data.frame(x=xs, y=unlist(peak_res), pair=0,line=rep(1:length(peak_res),sapply(peak_res,length)), type=1)
     }
     )
 
@@ -971,6 +972,7 @@ require(imager)
       res <- rings.m(c.peak$cp, input$prob, sel$sel, 0.05)
       res$band_x1 <- input$band_x1
       res$band_xn <- input$band_xn
+      res$type=1
       r.multi$m <- res
     }
     )
@@ -1007,9 +1009,8 @@ require(imager)
          res <- r$m
          res <- res[order(res$y),]
          for(i in 1:(nrow(res)-1)){
-           res[i,5] <- dist(res[c(i,i+1),1:2])
+           res[i,"distance"] <- dist(res[c(i,i+1),1:2])
           }
-        colnames(res)[5] <- "distance"
         }else{
         id.line <- unique(r$m$line)
         res.l <- list()
@@ -1017,9 +1018,8 @@ require(imager)
             res.i <- r$m[r$m$line==id.line[j],]
             res.i <- res.i[order(res.i$y),]
             for(i in 1:(nrow(res.i)-1)){
-              res.i[i,5] <- dist(res.i[c(i,i+1),1:2])
+              res.i[i,"distance"] <- dist(res.i[c(i,i+1),1:2])
             }
-            colnames(res.i)[5] <- "distance"
             res.l[[j]] <- res.i
           }
         
