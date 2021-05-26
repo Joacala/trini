@@ -4,8 +4,7 @@ library(shiny)
 library(keys)
 
 
-
-line.measured <- function(imc,rsize.per){
+line.measured <- function(imc,rsize.per,name){
 require(imager)
   
   im <- resize(imc, rsize.per, rsize.per) # x = width; y =heigh
@@ -19,7 +18,7 @@ require(imager)
   
   ui <- fluidPage(
     useKeys(),
-    titlePanel("tring"),
+    titlePanel(paste("tring... measuring:",name)),
     
     
     sidebarLayout(
@@ -159,7 +158,7 @@ require(imager)
                                         label = "Image resolution (ppp)", 
                                         value = NA,
                                         step = 1),
-                           textInput("file_dis_ring", "Compute and save distances between rings", value = "distance_ring.csv"),
+                           textInput("file_dis_ring", "Compute and save distances between rings", value = paste(name,"distance_ring.csv")),
                            actionButton("dis_ring", "Run & save"),
                            textInput("file_dis_late", "Compute and save distances between ring parts", value = "distance_parts.csv"),
                            actionButton("dis_late", "Run & save"))
@@ -303,6 +302,9 @@ require(imager)
                yaxs="i", xaxs="i",
                xlim=xli,  ylim = yli,xlab="",ylab="") 
             lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
+            abline(v=input$band_x1,lwd=0.1,lty=2)
+            if(input$line_type=="mul"){abline(v=input$band_xn,lwd=0.1,lty=2)}
+              
           }
            else{
             if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,input$qv,na.rm=T))}
@@ -779,8 +781,12 @@ require(imager)
         if(input$cor_type == "int"){
           if(num.click.cor$r == 0){
             np <- nearPoints(r$m, input$plot_click, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
+            if(sum(np$selected_)==0){
+              showNotification("Please click closer to an existing point", duration = 10, type="error")
+            }else{
             r$m[nrow(r$m)+1,4] <- r$m$line[np$selected_]
             num.click.cor$r <- 1
+            }
           }else{
             r$m[nrow(r$m),1] <- input$plot_click$x
             r$m[nrow(r$m),2] <- input$plot_click$y
@@ -823,10 +829,7 @@ require(imager)
 
             # interseccion
             r.multi$m <- r.multi$m[order(r.multi$m$y),]
-            NAs <- which(is.na(r.multi$m[,7]))
-            NAs <- NAs[NAs!=nrow(r.multi$m)]
-            
-            for(i in NAs){
+            for(i in 2:nrow(r.multi$m)-1){
               x0 <-r.multi$m[i,]
               xi <- r.multi$m[i+1,]
               if(x0["slope"]==0){
@@ -858,6 +861,19 @@ require(imager)
           click.count2$cc2 <- click.count2$cc2+1
           np <- nearPoints(r.multi$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
           r.multi$m <- r.multi$m[!np$selected_,]
+          r.multi$m <- r.multi$m[order(r.multi$m$y),]
+          for(i in 2:nrow(r.multi$m)-1){
+            x0 <-r.multi$m[i,]
+            xi <- r.multi$m[i+1,]
+            if(x0["slope"]==0){
+              x.inter <- x0["x"]
+              y.inter <- xi["y"]
+            }else{
+              x.inter <- (x0["p.intercept"] - xi["intercept"])/(xi["slope"]-x0["p.slope"])
+              y.inter <- xi["slope"]*x.inter + xi["intercept"]
+            }
+            r.multi$m[i,c(7,8)] <- c(x.inter,y.inter)	
+          }
         }
         if(input$cor_type == "over"){
             np <- nearPoints(r$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
@@ -1003,7 +1019,7 @@ require(imager)
     ## measures events ----------------------------------------------------------
     
     observeEvent(input$dis_ring,{
-      capture.output(c(Sys.time()-time.c,click.count$cc,click.count2$cc2),file=paste("time_",input$file_dis_ring,sep=""))
+      capture.output(c(Sys.time()-time.c,click.count$cc,click.count2$cc2),file=paste(name," time_",input$file_dis_ring,sep=""))
       if(input$save_type!="multi"){
         if(sum(r$m$pair)==0){
          res <- r$m
@@ -1084,10 +1100,10 @@ require(imager)
 }
 
 ### cargar datos
-
 imc <- load.image("02-data\\bec_tune.jpeg")
 rsize.per <- -10
-line.measured(imc,rsize.per)
+name <- "testigo de prueba"
+line.measured(imc,rsize.per,name)
 
 
 
