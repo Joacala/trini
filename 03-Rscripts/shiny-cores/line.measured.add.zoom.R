@@ -132,7 +132,7 @@ require(imager)
                            actionButton("select_multi", "Select multi")),
                   
                   tabPanel("Correction", value="corr",
-                           actionButton("rese", "Reset"),
+                           # actionButton("rese", "Reset"),
                            radioButtons(
                              inputId = "cor_type",
                              label = "Correction type",
@@ -681,8 +681,8 @@ require(imager)
         ranges$y = c(0,dim(imc)[2])
       }
       ran <- (ranges$y[2]-ranges$y[1])
-      ranges$y[1] <- ranges$y[1]-ran +(ran*0.5)
-      ranges$y[2] <- ranges$y[2]-ran +(ran*0.5)
+      ranges$y[1] <- ranges$y[1]-ran +(ran*0.9)
+      ranges$y[2] <- ranges$y[2]-ran +(ran*0.9)
     })
     
     observeEvent(input$down,{
@@ -691,8 +691,8 @@ require(imager)
         ranges$y = c(0,dim(imc)[2])
       }else{
         ran <- (ranges$y[2]-ranges$y[1])
-        ranges$y[1] <- ranges$y[1]+ran -(ran*0.5)
-        ranges$y[2] <- ranges$y[2]+ran -(ran*0.5)
+        ranges$y[1] <- ranges$y[1]+ran -(ran*0.9)
+        ranges$y[2] <- ranges$y[2]+ran -(ran*0.9)
       }
     })
     
@@ -702,8 +702,8 @@ require(imager)
         ranges$y = c(0,dim(imc)[2])
       }else{
         ran <- (ranges$x[2]-ranges$x[1])
-        ranges$x[1] <- ranges$x[1]+ran -(ran*0.8)
-        ranges$x[2] <- ranges$x[2]+ran -(ran*0.8)
+        ranges$x[1] <- ranges$x[1]+ran -(ran*0.9)
+        ranges$x[2] <- ranges$x[2]+ran -(ran*0.9)
         
       }
     })
@@ -714,8 +714,8 @@ require(imager)
         ranges$y = c(0,dim(imc)[2])
       }else{
         ran <- (ranges$x[2]-ranges$x[1])
-        ranges$x[1] <- ranges$x[1]-ran +(ran*0.8)
-        ranges$x[2] <- ranges$x[2]-ran +(ran*0.8)
+        ranges$x[1] <- ranges$x[1]-ran +(ran*0.9)
+        ranges$x[2] <- ranges$x[2]-ran +(ran*0.9)
       }
     })
     
@@ -927,9 +927,15 @@ require(imager)
     observeEvent(input$run_smooth,{
 
       if(input$line_type == "int"){
+        if(nrow(rv$m)<1){showNotification("Please first draw lines interactively", duration = 10, type="error")
+          }else{
+        if(nrow(rv$m)==1 & is.na(rv$m[1,1])){
+          showNotification("Please first draw lines interactively", duration = 10, type="error")
+        }else{
           smooth_int <- apply(rv$m,1, function(y)clever.smooth.interactive(x,y,input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha))
           smooth.int$res <- sapply(smooth_int,function(x)x[[1]])
           smooth.int.x$res <- data.frame(sapply(smooth_int,function(x)x[[2]]))
+        }}
       }else{
       if(input$line_type == "sin"){ 
         
@@ -956,14 +962,24 @@ require(imager)
     
     ## ring events ----------------------------------------------------------
     
-    observeEvent(input$run_peak_single,{  
-      smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,input$qv,na.rm=T))
-      peak_res <- peaks(smooth_res[,1],input$score,input$join)
-      r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0, line=0, type=1)
-     }
+    observeEvent(input$run_peak_single,{
+      if(is.null(smooth$res)){
+        showNotification("Plese select the correct detection procedure", duration = 10, type="error")
+      }else{
+      if(ncol(smooth$res)>1){
+        showNotification("Plese select the correct detection procedure", duration = 10, type="error")
+      }else{
+        smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,input$qv,na.rm=T))
+        peak_res <- peaks(smooth_res[,1],input$score,input$join)
+        r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0, line=0, type=1)
+      }
+     }}
     )
     
-    observeEvent(input$run_peak_int,{  
+    observeEvent(input$run_peak_int,{
+      if(is.null(smooth.int$res)){
+        showNotification("Plese select the correct detection procedure", duration = 10, type="error")
+      }else{
       smooth_res <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,input$qv,na.rm=T))
       peak_res <-apply(smooth_res,2,peaks,input$score,input$join)
       if(!is.list(peak_res)) {peak_res <- list(peak_res)}
@@ -972,34 +988,46 @@ require(imager)
         xs <- c(xs,smooth.int.x$res[peak_res[[i]],i])
       }
       r$m <- data.frame(x=xs, y=unlist(peak_res), pair=0,line=rep(1:length(peak_res),sapply(peak_res,length)), type=1)
+      }
     }
     )
 
     observeEvent(input$run_peak_multi,{
+      if(is.null(smooth$res)){
+        showNotification("Plese select the correct detection procedure", duration = 10, type="error")
+      }else{
+      if(ncol(smooth$res)==1){
+        showNotification("Plese select the correct detection procedure", duration = 10, type="error")
+      }else{
       smooth_res <- apply(smooth$res, 2, function(x){x*(dim(imc)[1]/2/quantile(x,input$qv))})
       peaks.multi <- apply(smooth_res,2,peaks,input$score,input$join)
       c.peak$cp <- clus.peak.bands (peaks.multi, input$join, sel$sel)
       prob <- sapply(c.peak$cp,function(x)length(unique(names(x)))/length(sel$sel))
       y <- sapply(c.peak$cp,mean)
       p$pval <- data.frame(prob=prob,y=y)
+      }}
     })
     
     observeEvent(input$select_multi,{
+      if(is.null(c.peak$cp)){
+        showNotification("Please first detect multi", duration = 10, type="error")
+      }else{
       res <- rings.m(c.peak$cp, input$prob, sel$sel, 0.05)
       res$band_x1 <- input$band_x1
       res$band_xn <- input$band_xn
       res$type=1
       r.multi$m <- res
+      }
     }
     )
     NULL+1
     ## correction events ----------------------------------------------------------
     
-     observeEvent(input$rese, {
-       smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,input$qv))
-       peak_res <- peaks(smooth_res[,1],input$score,input$join)
-       r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0)
-     })
+     # observeEvent(input$rese, {
+     #   smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,input$qv))
+     #   peak_res <- peaks(smooth_res[,1],input$score,input$join)
+     #   r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0)
+     # })
     
     
 
@@ -1008,19 +1036,39 @@ require(imager)
    
     
     observeEvent(input$run_late,{  # sino funciona el por el r$m$pair y line
-      late$l <- late.f (smooth$res, r$m)
+      if(is.null(smooth$res)){
+        showNotification("Please first detect rings using single", duration = 10, type="error")
+      }else{
+        if(ncol(smooth$res)>1){
+          showNotification("Please first detect rings using single", duration = 10, type="error")
+         }else{
+          late$l <- late.f (smooth$res, r$m)
+        }
+        
+      }
     }
     )
     
     observeEvent(input$rese_late, {
-      late$l <- late.f (smooth$res, r$m)
+      if(is.null(smooth$res)){
+        showNotification("Please first detect rings using single", duration = 10, type="error")
+      }else{
+        if(ncol(smooth$res)>1){
+          showNotification("Please first detect rings using single", duration = 10, type="error")
+        }else{
+          late$l <- late.f (smooth$res, r$m)
+        }
+      }
     })
     
     ## measures events ----------------------------------------------------------
     
     observeEvent(input$dis_ring,{
       capture.output(c(Sys.time()-time.c,click.count$cc,click.count2$cc2),file=paste(name," time_",input$file_dis_ring,sep=""))
-      if(input$save_type!="multi"){
+ 
+       if(input$save_type!="multi"){
+       if(is.null(r$m)){showNotification("Please first detect rings", duration = 10, type="error")
+         }else{
         if(sum(r$m$pair)==0){
          res <- r$m
          res <- res[order(res$y),]
@@ -1053,20 +1101,26 @@ require(imager)
         
         res <- do.call(rbind,res.l[order(sapply(res.l,min))])
         }
-        
+         }
       }else{
+        if(is.null(r.multi$m)){
+          showNotification("Please first detect rings", duration = 10, type="error")
+          }else{
         res <- r.multi$m
         res <- data.frame(res[order(res$y),])
         res$distance<- apply(res,1,function(x)sqrt((x[5]-x[7])^2+(x[6]-x[8])^2))
-        }
+      }}
+      if(is.null(r.multi$m) & is.null(r$m)){
+        showNotification("Please first detect rings", duration = 10, type="error")
+      }else{
       res$year <- input$year-c(1:nrow(res)-1)
       res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
       write.table(res,input$file_dis_ring,row.names=F)
-      
+      }
       })
     
     observeEvent(input$dis_late,{
-      if(input$save_type=="single"){
+      if(input$save_type=="single" & !is.null(late$l)){
       colnames(late$l) <- c("xl","yl")
       res <- data.frame(cbind(r$m,late$l))
       res <- res[order(res$y),]
