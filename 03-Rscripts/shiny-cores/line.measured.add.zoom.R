@@ -770,13 +770,16 @@ require(imager)
       }}
       if(input$tabs=="corr"){
         if(input$cor_type == "single"){
+          if(length(unique(r$m$line))>1){
+          showNotification("Plese select the correct correction type", duration = 10, type="error")
+          }else{
           click.count$cc <- click.count$cc + 1
           r$m[nrow(r$m)+1,1] <- input$plot_click$x
           r$m[nrow(r$m),2] <- input$plot_click$y
           r$m[nrow(r$m),3] <- 0
           r$m[nrow(r$m),4] <- 0
-          #r$m <- rbind(r$m,c(unlist(input$plot_click),0))
           r$m <- r$m[order(r$m$y),]
+          }
         }
         if(input$cor_type == "int"){
           if(num.click.cor$r == 0){
@@ -1067,7 +1070,9 @@ require(imager)
       capture.output(c(Sys.time()-time.c,click.count$cc,click.count2$cc2),file=paste(name," time_",input$file_dis_ring,sep=""))
  
        if(input$save_type!="multi"){
-       if(is.null(r$m)){showNotification("Please first detect rings", duration = 10, type="error")
+       if(is.null(r$m)){
+         if(input$save_type=="single"){showNotification("Please first detect rings using single", duration = 10, type="error")}
+         if(input$save_type=="int"){showNotification("Please first detect rings using interactive", duration = 10, type="error")}
          }else{
         if(sum(r$m$pair)==0){
          res <- r$m
@@ -1076,8 +1081,8 @@ require(imager)
            res[i,"distance"] <- dist(res[c(i,i+1),1:2])
           }
         }else{
-        id.line <- unique(r$m$line)
-        res.l <- list()
+          id.line <- unique(r$m$line)
+          res.l <- list()
           for(j in 1:length(id.line)){
             res.i <- r$m[r$m$line==id.line[j],]
             res.i <- res.i[order(res.i$y),]
@@ -1086,37 +1091,44 @@ require(imager)
             }
             res.l[[j]] <- res.i
           }
-        
-        res.l <- res.l[order(tapply(r$m$y,r$m$line,min))]
-        id.pair <- unique(r$m$pair); id.pair <- id.pair[id.pair!=0]
-        for(i in 1:length(id.pair)){
-          sel <- 1:length(res.l)[sapply(res.l,function(x)id.pair%in%x$pair)]
-          fl <- res.l[min(sel)][[1]] 
-          sl <- res.l[max(sel)][[1]] 
-          fl<- fl[-nrow(fl),]
-          ul<- rbind(fl,sl)
-          res.l <- res.l[-sel]         
-          res.l [[length(res.l)+1]]<-ul
-        }
-        
-        res <- do.call(rbind,res.l[order(sapply(res.l,min))])
+          
+          res.l <- res.l[order(sapply(res.l,function(x)min(x$y)))]
+          id.pair <- unique(r$m$pair); id.pair <- id.pair[id.pair!=0]
+          for(i in 1:length(id.pair)){
+            sel <- c(1:length(res.l))[sapply(res.l,function(x)id.pair[i]%in%x$pair)]
+            fl <- res.l[min(sel)][[1]] 
+            sl <- res.l[max(sel)][[1]] 
+            fl<- fl[-nrow(fl),]
+            ul<- rbind(fl,sl)
+            res.l <- res.l[-sel]         
+            res.l [[length(res.l)+1]]<-ul
+            res.l <- res.l[order(sapply(res.l,function(x)min(x$y)))]
+          }
+          
+          res <- do.call(rbind,res.l)
+          res$year <- input$year-c(1:nrow(res)-1)
+          res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
+          write.table(res,input$file_dis_ring,row.names=F)
         }
          }
       }else{
         if(is.null(r.multi$m)){
-          showNotification("Please first detect rings", duration = 10, type="error")
+          showNotification("Please first detect rings using multi", duration = 10, type="error")
           }else{
         res <- r.multi$m
         res <- data.frame(res[order(res$y),])
         res$distance<- apply(res,1,function(x)sqrt((x[5]-x[7])^2+(x[6]-x[8])^2))
+        res$year <- input$year-c(1:nrow(res)-1)
+        res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
+        write.table(res,input$file_dis_ring,row.names=F)
       }}
-      if(is.null(r.multi$m) & is.null(r$m)){
-        showNotification("Please first detect rings", duration = 10, type="error")
-      }else{
-      res$year <- input$year-c(1:nrow(res)-1)
-      res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
-      write.table(res,input$file_dis_ring,row.names=F)
-      }
+      # if(is.null(r.multi$m) & is.null(r$m)){
+      #   showNotification("Please first detect rings", duration = 10, type="error")
+      # }else{
+      # res$year <- input$year-c(1:nrow(res)-1)
+      # res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
+      # write.table(res,input$file_dis_ring,row.names=F)
+      # }
       })
     
     observeEvent(input$dis_late,{
