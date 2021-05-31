@@ -108,7 +108,7 @@ require(imager)
                                       max = dim(imc)[1], 
                                       step = 1),
                                actionButton("run_smooth", "Run"),
-                           actionButton("save_kk", "save")),
+                           #actionButton("save_kk", "save")),
                   tabPanel("Ring detection",value="score.p",
                            sliderInput("score","Score", min = round(slider.size+(0.1*slider.size),2), max = 0, round=-2,step=0.01,
                                        value = slider.size/2),
@@ -903,9 +903,9 @@ require(imager)
       }}
     })
     
-    observeEvent(input$save_kk, {
-     write.csv(r$m,file="beca_toca_pelotas.csv")
-    })
+    # observeEvent(input$save_kk, {
+    #  write.csv(r$m,file="beca_toca_pelotas.csv")
+    # })
     
     # observeEvent(input$undo_key, {
     #   if(input$tabs=="line"){
@@ -1067,7 +1067,7 @@ require(imager)
     ## measures events ----------------------------------------------------------
     
     observeEvent(input$dis_ring,{
-      capture.output(c(Sys.time()-time.c,click.count$cc,click.count2$cc2),file=paste(name," time_",input$file_dis_ring,sep=""))
+      capture.output(c(Sys.time()-time.c,click.count$cc,click.count2$cc2),file=file.path("04-results",paste(name," time_",input$file_dis_ring,sep="")))
  
        if(input$save_type!="multi"){
        if(is.null(r$m)){
@@ -1108,7 +1108,7 @@ require(imager)
           res <- do.call(rbind,res.l)
           res$year <- input$year-c(1:nrow(res)-1)
           res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
-          write.table(res,input$file_dis_ring,row.names=F)
+          write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
         }
          }
       }else{
@@ -1120,7 +1120,7 @@ require(imager)
         res$distance<- apply(res,1,function(x)sqrt((x[5]-x[7])^2+(x[6]-x[8])^2))
         res$year <- input$year-c(1:nrow(res)-1)
         res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
-        write.table(res,input$file_dis_ring,row.names=F)
+        write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
       }}
       # if(is.null(r.multi$m) & is.null(r$m)){
       #   showNotification("Please first detect rings", duration = 10, type="error")
@@ -1149,7 +1149,7 @@ require(imager)
       res[,"early(cm)"] <- (res$early/input$ppp)*2.54
       res[,"late(cm)"] <- (res$late/input$ppp)*2.54
 
-      write.table(res,input$file_dis_late,row.names=F)
+      write.table(res,file=file.path("04-results",input$file_dis_late),row.names=F)
       }else{showNotification("Sorry only implemented for single type", duration = 10, type="error")}
       
     }
