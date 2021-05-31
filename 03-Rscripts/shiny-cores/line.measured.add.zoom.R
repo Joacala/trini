@@ -107,7 +107,7 @@ require(imager)
                                       min = 1, 
                                       max = dim(imc)[1], 
                                       step = 1),
-                               actionButton("run_smooth", "Run"),
+                               actionButton("run_smooth", "Run")),
                            #actionButton("save_kk", "save")),
                   tabPanel("Ring detection",value="score.p",
                            sliderInput("score","Score", min = round(slider.size+(0.1*slider.size),2), max = 0, round=-2,step=0.01,
@@ -166,7 +166,7 @@ require(imager)
       )
       )
     )
-
+  
 
   server <- function(input, output) {
     
@@ -670,8 +670,8 @@ require(imager)
     
     observeEvent(input$plot1_brush, {
       if(input$tabs!="load_data"){
-        ranges$x <- c(input$plot1_brush$xmin * abs(rsize.per), input$plot1_brush$xmax * abs(rsize.per))
-        ranges$y <- c(input$plot1_brush$ymin * abs(rsize.per), input$plot1_brush$ymax * abs(rsize.per))
+        ranges$x <- c(input$plot1_brush$xmin * 100/abs(rsize.per), input$plot1_brush$xmax * 100/abs(rsize.per))
+        ranges$y <- c(input$plot1_brush$ymin * 100/abs(rsize.per), input$plot1_brush$ymax * 100/abs(rsize.per))
       }
     })
     
@@ -796,6 +796,7 @@ require(imager)
             r$m[nrow(r$m),3] <- 0
             r$m <- r$m[order(r$m$y),]
             num.click.cor$r <- 0
+            click.count$cc <- click.count$cc + 1
           }
         }
         if(input$cor_type == "over"){
@@ -807,7 +808,7 @@ require(imager)
             np <- nearPoints(r$m, input$plot_click, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
             r$m$pair[np$selected_] <-  max(r$m$pair)
             num.click.cor$r <- 0
-        }}
+          }}
         if(input$cor_type == "multi"){
           if(num.click.cor$r == 0){
             data.cor.multi$m <- unlist(input$plot_click)
@@ -1104,13 +1105,12 @@ require(imager)
             res.l [[length(res.l)+1]]<-ul
             res.l <- res.l[order(sapply(res.l,function(x)min(x$y)))]
           }
-          
           res <- do.call(rbind,res.l)
-          res$year <- input$year-c(1:nrow(res)-1)
-          res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
-          write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
-        }
          }
+         res$year <- input$year-c(1:nrow(res)-1)
+         res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
+         write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
+        }
       }else{
         if(is.null(r.multi$m)){
           showNotification("Please first detect rings using multi", duration = 10, type="error")
@@ -1167,7 +1167,7 @@ require(imager)
 
 ### cargar datos
 imc <- load.image("02-data\\bec_tune.jpeg")
-rsize.per <- -10
+rsize.per <- -95
 name <- "testigo de prueba"
 line.measured(imc,rsize.per,name)
 
