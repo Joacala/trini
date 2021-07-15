@@ -820,9 +820,10 @@ require(imager)
             
             #pendiente
             m <- (data.cor.multi$m[1,2]-data.cor.multi$m[2,2])/(data.cor.multi$m[1,1]-data.cor.multi$m[2,1])
-       
+            
             #intercepto
             b <- data.cor.multi$m[1,2] - m * data.cor.multi$m[1,1] 
+            Inf + -Inf * 2
             
             # perdendicular 
             x.center <- mean(c(data.cor.multi$m[1,1],data.cor.multi$m[2,1]))
@@ -833,9 +834,11 @@ require(imager)
 
             # interseccion
             r.multi$m <- r.multi$m[order(r.multi$m$y),]
+            r.multi$m <- r.multi$m[!is.na(r.multi$m[,"slope"]),]#OJO revisar fallo cuando x0["slope"]== NA
             for(i in 2:nrow(r.multi$m)-1){
               x0 <-r.multi$m[i,]
               xi <- r.multi$m[i+1,]
+              #OJO revisar fallo cuando x0["slope"]== NA
               if(x0["slope"]==0){
                 x.inter <- x0["x"]
                 y.inter <- xi["y"]
