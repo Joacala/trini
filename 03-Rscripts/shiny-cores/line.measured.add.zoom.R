@@ -37,6 +37,10 @@ require(imager)
                  div(plotOutput("plot1",
                                 height = 600,
                                 width = 600,
+                                # brush = brushOpts(
+                                #   id = "plot1_brush",
+                                #   fill="",stroke=T,
+                                #   resetOnNew = T),
                                 click = "plot_click",
                                 dblclick = dblclickOpts(id = "plot_click2")),
                      style="position:absolute; top:0; left:0;"))),
@@ -46,16 +50,14 @@ require(imager)
                         height = 300,
                         width = 300,
                         brush = brushOpts(
-                          id = "plot1_brush",
-                          fill="",stroke="",
-                         resetOnNew = FALSE)),
+                          id = "plot3_brush",
+                          fill="",stroke=1,
+                         resetOnNew = T)),
       )
     )
     ),
     sidebarPanel(
       tabsetPanel(id="tabs",
-                  # tabPanel("Load data",value="load_data",
-                  #          actionButton("start_time", "Start Measure time")),
                   tabPanel("Line measured",value="line",
                            actionButton("undo", "Undo")),
                   tabPanel("Smoothing",value="smooth",
@@ -161,7 +163,11 @@ require(imager)
                            textInput("file_dis_ring", "Compute and save distances between rings", value = paste(name,"distance_ring.csv")),
                            actionButton("dis_ring", "Run & save"),
                            textInput("file_dis_late", "Compute and save distances between ring parts", value = "distance_parts.csv"),
-                           actionButton("dis_late", "Run & save"))
+                           actionButton("dis_late", "Run & save")),
+                  tabPanel("Load data",value="load_data",
+                           textInput("load_file", "Load ring data", value = "name.csv"),
+                           textInput("sep", "Separator", value = ";"),
+                           actionButton("load", "Load"))
           )
       )
       )
@@ -658,9 +664,10 @@ require(imager)
     })
     
     output$plot3 <- renderPlot({
-      if(input$tabs!="load_data"){
+      #if(input$tabs!="measure"){
         plot(im,xlim=c(dim(im)[2]/2*-1,dim(im)[2]/2),ylim=c(dim(im)[2],0),asp="varying")
-      }
+        #rect(ranges$x[1]/abs(rsize.per), ranges$y[2]/abs(rsize.per), ranges$x[2]/abs(rsize.per), ranges$y[1]/abs(rsize.per))
+      #}
     })
     
     
@@ -668,10 +675,29 @@ require(imager)
 # observe events ----------------------------------------------------------
     ## plot management ----------------------------------------------------------
     
-    observeEvent(input$plot1_brush, {
+    observeEvent(input$plot3_brush, {
       if(input$tabs!="load_data"){
-        ranges$x <- c(input$plot1_brush$xmin * 100/abs(rsize.per), input$plot1_brush$xmax * 100/abs(rsize.per))
-        ranges$y <- c(input$plot1_brush$ymin * 100/abs(rsize.per), input$plot1_brush$ymax * 100/abs(rsize.per))
+        ranges$x <- c(input$plot3_brush$xmin * 100/abs(rsize.per), input$plot3_brush$xmax * 100/abs(rsize.per))
+        ranges$y <- c(input$plot3_brush$ymin * 100/abs(rsize.per), input$plot3_brush$ymax * 100/abs(rsize.per))
+      }
+    })
+    
+    observeEvent(input$plot1_brush, {
+      if(input$tabs=="corr"){
+        
+        if(input$cor_type%in%c("single","int")){
+              r$m[!c(r$m$x>=input$plot1_brush$xmin & 
+              r$m$x<=input$plot1_brush$xmax &
+              r$m$y>=input$plot1_brush$ymin & 
+              r$m$y<=input$plot1_brush$ymax),]
+        }
+        if(input$cor_type%in%c("multi")){
+        r.multi$m[!c(r.multi$m$x>=input$plot1_brush$xmin & 
+                 r.multi$m$x<=input$plot1_brush$xmax &
+                 r.multi$m$y>=input$plot1_brush$ymin & 
+                 r.multi$m$y<=input$plot1_brush$ymax),]
+        }
+
       }
     })
     
@@ -819,11 +845,13 @@ require(imager)
             data.cor.multi$m <- rbind(data.cor.multi$m,unlist(input$plot_click))
             
             #pendiente
+            if(data.cor.multi$m[1,1]==data.cor.multi$m[2,1]){data.cor.multi$m[2,1] = data.cor.multi$m[2,1]+(1e-5*data.cor.multi$m[2,1])}
             m <- (data.cor.multi$m[1,2]-data.cor.multi$m[2,2])/(data.cor.multi$m[1,1]-data.cor.multi$m[2,1])
+            
             
             #intercepto
             b <- data.cor.multi$m[1,2] - m * data.cor.multi$m[1,1] 
-            Inf + -Inf * 2
+            
             
             # perdendicular 
             x.center <- mean(c(data.cor.multi$m[1,1],data.cor.multi$m[2,1]))
@@ -831,7 +859,7 @@ require(imager)
             pendendicular.slope <- -1/m
             new.inter <- y.center - (-1/m) * x.center
             r.multi$m[nrow(r.multi$m)+1,c(1:6,9:11)] <- c(b,m,new.inter,pendendicular.slope,x.center,y.center,data.cor.multi$m[1,1],data.cor.multi$m[2,1],NA)
-
+            
             # interseccion
             r.multi$m <- r.multi$m[order(r.multi$m$y),]
             r.multi$m <- r.multi$m[!is.na(r.multi$m[,"slope"]),]#OJO revisar fallo cuando x0["slope"]== NA
@@ -892,6 +920,13 @@ require(imager)
         np <- nearPoints(late$l, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
         late$l <- late$l[!np$selected_,]
       }
+    })
+    
+    ## load events ----------------------------------------------------------
+    observeEvent(input$load, {
+      dat <- read.csv(input$load_file,sep = input$sep)
+      if("slope"%in%colnames(dat)){r.multi$m = dat
+      }else{r$m = dat}
     })
     
     ## lines events ----------------------------------------------------------
