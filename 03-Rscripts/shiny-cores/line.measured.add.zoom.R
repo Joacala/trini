@@ -141,7 +141,8 @@ require(imager)
                              choices = list("Single" = "single",
                                             "Interactive" = "int",
                                             "Interactive overlap" = "over",
-                                            "Multi" = "multi"))),
+                                            "Multi" = "multi",
+                                            "Breaks" = "breaks"))),
                   tabPanel("Late wood", value="late",
                            actionButton("run_late", "Run"),
                            actionButton("rese_late", "Reset")),
@@ -228,33 +229,41 @@ require(imager)
           #}
         }}
       if(input$tabs=="corr"){
-        if(is.null(r)){
-          return(NULL)
-        }
-        
         par(bg="transparent")
 
-        if(input$cor_type == "single"){        
+        if(input$cor_type %in% c("single")){        
           plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
         }
-        if(input$cor_type == "multi"){
+        if(input$cor_type %in% c("multi")){
             plot(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
             apply(r.multi$m,1,function(x)segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1))
             points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,col=4)
         }
-        if(input$cor_type == "int"){        
+        if(input$cor_type %in% c("int")){        
           plot(r$m$y~r$m$x,pch=3,cex=1.5,col=r$m$line,
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
         }
-        if(input$cor_type == "over"){     
+        if(input$cor_type %in% c("over")){     
               plot(r$m$y~r$m$x,pch=3,cex=1.5,col=r$m$pair+1,
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
+        }
+        if(input$cor_type %in% c("breaks")){     
+          plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
+               yaxs="i", xaxs="i",
+               xlim=xli ,ylim=yli,xlab="",ylab="")
+            if(!is.null(breaks_y$by)){
+            if(nrow(breaks_y$by)>0){
+               apply(breaks_y$by,1,function(x){
+                      segments(x0=0,y0=x[1],x1=dim(imc)[1],y1=x[1],col=1,lty=2)
+                      if(!is.na(x[2])){segments(x0=0,y0=x[2],x1=dim(imc)[1],y1=x[2],col=1,lty=2)}
+                      })
+            }}
         }
       }      
       if(input$tabs=="score.p"){
@@ -652,6 +661,8 @@ require(imager)
     # time = reactiveValues(t = c())
     click.count <- reactiveValues(cc = c(0))
     click.count2 <- reactiveValues(cc2 = c(0))
+    click.count.break <- reactiveValues(ccb = c(0))
+    breaks_y <- reactiveValues(by=NULL)
     
 # plots -------------------------------------------------------------------
     
@@ -835,6 +846,39 @@ require(imager)
             r$m$pair[np$selected_] <-  max(r$m$pair)
             num.click.cor$r <- 0
           }}
+        
+        if(input$cor_type == "breaks"){
+          if(click.count.break$ccb == 0){
+            breaks_y$by <- rbind(breaks_y$by,c(input$plot_click$y,NA))
+            click.count.break$ccb <- 1
+          }else{
+            y2 <- input$plot_click$y
+            if(sum(r$m$y >= breaks_y$by[nrow(breaks_y$by),1] & r$m$y <= y2)>0 | 
+               sum(r.multi$m$y >= breaks_y$by[nrow(breaks_y$by),1] & r.multi$m$y <= y2)>0){
+              showNotification("A ring edge is within the break", duration = 10, type="error")
+              breaks_y$by <- matrix(breaks_y$by[-nrow(breaks_y$by),],ncol=2)
+            }else if(breaks_y$by[nrow(breaks_y$by),1]>=y2){ 
+              showNotification("Please place the second edge of the break below the first egde", duration = 10, type="error")
+              breaks_y$by <- matrix(breaks_y$by[-nrow(breaks_y$by),],ncol=2)
+            }else if(nrow(breaks_y$by)>1){
+                    if(sum(apply(matrix(breaks_y$by[-nrow(breaks_y$by),],ncol=2),1,function(x){
+                      breaks_y$by[nrow(breaks_y$by),1] >= x[1] & 
+                        breaks_y$by[nrow(breaks_y$by),1] <= x[2] |
+                        y2 >= x[1] & 
+                        y2 <= x[2] |
+                        breaks_y$by[nrow(breaks_y$by),1] <= x[1] &
+                        y2 >= x[2]
+                        }))>0){
+                           showNotification("Overlapping breaks", duration = 10, type="error")
+                           breaks_y$by <- matrix(breaks_y$by[-nrow(breaks_y$by),],ncol=2)
+                    }else{     
+                      breaks_y$by[nrow(breaks_y$by),2] <- y2
+              }}else{
+                      breaks_y$by[nrow(breaks_y$by),2] <- y2
+            }
+            click.count.break$ccb <- 0
+          }}
+
         if(input$cor_type == "multi"){
           if(num.click.cor$r == 0){
             data.cor.multi$m <- unlist(input$plot_click)
@@ -915,6 +959,16 @@ require(imager)
             pair <- r$m$pair[np$selected_]
             r$m$pair[r$m$pair==pair]<-  0
         }
+        if(input$cor_type == "breaks"){
+          if(!is.null(breaks_y$by)){
+            if(nrow(breaks_y$by)!=0){
+            if(!c(nrow(breaks_y$by)==1 & is.na(breaks_y$by[1,2]))){
+          yc <- input$plot_click2$y
+          sel <- apply(matrix(breaks_y$by[!is.na(breaks_y$by[,2]),],ncol=2),1,function(x){ 
+            yc >= x[1] & 
+            yc <= x[2]})
+          breaks_y$by <-   breaks_y$by[!sel,]
+         }}}}
       }
       if(input$tabs=="late"){
         np <- nearPoints(late$l, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
@@ -1146,9 +1200,18 @@ require(imager)
           res <- do.call(rbind,res.l)
          }
          res$year <- input$year-c(1:nrow(res)-1)
-         res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
-         write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
-        }
+         if(is.na(breaks_y$by[nrow(breaks_y$by),2])){showNotification("Please first close the last break", duration = 10, type="error")
+           }else{
+            breaks_y$by <- breaks_y$by[order(breaks_y$by),]
+            breaks_y$by$dist <- breaks_y$by[,2]-breaks_y$by[,1]
+            for(i in 2:nrow(res)-1){
+              dist.i <- sum(breaks_y$by[breaks_y$by[,1] > res$y[i] & breaks_y$by[,2] < res$y[i+1],"dist"])
+              res$distance[i] <- res$distance[i]-dist.i
+            }
+            
+            res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
+            write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
+        }}
       }else{
         if(is.null(r.multi$m)){
           showNotification("Please first detect rings using multi", duration = 10, type="error")
@@ -1203,11 +1266,11 @@ require(imager)
   
 }
 
+
 ### cargar datos
 imc <- load.image("02-data\\bec_tune.jpeg")
 rsize.per <- -95
 name <- "testigo de prueba"
 line.measured(imc,rsize.per,name)
-
 
 
