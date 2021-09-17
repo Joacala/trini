@@ -253,7 +253,8 @@ require(imager)
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
         }
-        if(input$cor_type %in% c("breaks")){     
+        if(input$cor_type %in% c("breaks")){
+          if(!is.null(r$m)){
           plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
@@ -264,7 +265,23 @@ require(imager)
                       if(!is.na(x[2])){segments(x0=0,y0=x[2],x1=dim(imc)[1],y1=x[2],col=1,lty=2)}
                       })
             }}
-        }
+          }
+          
+          if(!is.null(r.multi$m)){
+            plot(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,
+                 yaxs="i", xaxs="i",
+                 xlim=xli ,ylim=yli,xlab="",ylab="")
+            apply(r.multi$m,1,function(x)segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1))
+            points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,col=4)
+            if(!is.null(breaks_y$by)){
+              if(nrow(breaks_y$by)>0){
+                apply(breaks_y$by,1,function(x){
+                  segments(x0=0,y0=x[1],x1=dim(imc)[1],y1=x[1],col=1,lty=2)
+                  if(!is.na(x[2])){segments(x0=0,y0=x[2],x1=dim(imc)[1],y1=x[2],col=1,lty=2)}
+                })
+              }}
+          }
+          }
       }      
       if(input$tabs=="score.p"){
 
@@ -1031,6 +1048,7 @@ require(imager)
           smooth_int <- apply(rv$m,1, function(y)clever.smooth.interactive(x,y,input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha))
           smooth.int$res <- sapply(smooth_int,function(x)x[[1]])
           smooth.int.x$res <- data.frame(sapply(smooth_int,function(x)x[[2]]))
+          r.multi$m=NULL
         }}
       }else{
       if(input$line_type == "sin"){ 
@@ -1039,6 +1057,7 @@ require(imager)
         }else{
           sel$sel <- input$band_x1
           smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha)
+          r.multi$m=NULL
           }
     
       }
@@ -1051,6 +1070,7 @@ require(imager)
          }else{
            sel$sel <- band.sel(input$band_x1,input$band_xn,input$band_N)
            smooth$res <- clever.smooth (x, sel$sel, input$hdm, input$hdm, input$hdm, input$hdm,  input$alpha)
+           r$m=NULL
            }
       }
      }}
@@ -1116,7 +1136,7 @@ require(imager)
       }
     }
     )
-    NULL+1
+    
     ## correction events ----------------------------------------------------------
     
      # observeEvent(input$rese, {
@@ -1200,18 +1220,25 @@ require(imager)
           res <- do.call(rbind,res.l)
          }
          res$year <- input$year-c(1:nrow(res)-1)
+         if(!is.null(breaks_y$by)){
          if(is.na(breaks_y$by[nrow(breaks_y$by),2])){showNotification("Please first close the last break", duration = 10, type="error")
            }else{
-            breaks_y$by <- breaks_y$by[order(breaks_y$by),]
-            breaks_y$by$dist <- breaks_y$by[,2]-breaks_y$by[,1]
+            breaks <- data.frame(breaks_y$by) 
+            breaks$dist <- breaks[,2]-breaks[,1]
             for(i in 2:nrow(res)-1){
-              dist.i <- sum(breaks_y$by[breaks_y$by[,1] > res$y[i] & breaks_y$by[,2] < res$y[i+1],"dist"])
+              dist.i <- sum(breaks[breaks[,1] > res$y[i] & breaks[,2] < res$y[i+1],"dist"])
               res$distance[i] <- res$distance[i]-dist.i
             }
             
             res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
             write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
-        }}
+           }
+         }else{            
+              res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
+               write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
+         }
+         
+         }
       }else{
         if(is.null(r.multi$m)){
           showNotification("Please first detect rings using multi", duration = 10, type="error")
@@ -1220,6 +1247,23 @@ require(imager)
         res <- data.frame(res[order(res$y),])
         res$distance<- apply(res,1,function(x)sqrt((x[5]-x[7])^2+(x[6]-x[8])^2))
         res$year <- input$year-c(1:nrow(res)-1)
+        if(!is.null(breaks_y$by)){
+          if(is.na(breaks_y$by[nrow(breaks_y$by),2])){showNotification("Please first close the last break", duration = 10, type="error")
+          }else{
+            breaks <- data.frame(breaks_y$by) 
+            breaks$dist <- breaks[,2]-breaks[,1]
+            for(i in 2:nrow(res)-1){
+              dist.i <- sum(breaks[breaks[,1] > res$y[i] & breaks[,2] < res$y[i+1],"dist"])
+              res$distance[i] <- res$distance[i]-dist.i
+            }
+            
+            res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
+            write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
+          }
+        }else{            
+          res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
+          write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
+        }
         res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
         write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
       }}
