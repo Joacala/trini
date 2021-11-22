@@ -3,7 +3,6 @@ library(imager)
 library(shiny)
 library(keys)
 
-
 line.measured <- function(imc,rsize.per,name){
 require(imager)
   
@@ -51,7 +50,7 @@ require(imager)
                         width = 300,
                         brush = brushOpts(
                           id = "plot3_brush",
-                          fill="",stroke=1,
+                          stroke=1,
                          resetOnNew = T)),
       )
     )
@@ -142,7 +141,10 @@ require(imager)
                                             "Interactive" = "int",
                                             "Interactive overlap" = "over",
                                             "Multi" = "multi",
-                                            "Breaks" = "breaks"))),
+                                            "Breaks" = "breaks",
+                                            "Comments" = "comments")),
+                           textInput("comments", "Comments", value = ""),
+                           actionButton("add_comment", "Add Comment")),
                   tabPanel("Late wood", value="late",
                            actionButton("run_late", "Run"),
                            actionButton("rese_late", "Reset")),
@@ -189,7 +191,7 @@ require(imager)
 # functions ---------------------------------------------------------------
 
     app.plot.img <- function(imc){
-       if(input$tabs!="load_data" | !is.null(imc)){
+       if(!is.null(imc)){#input$tabs!="load_data" |
         if(is.null(ranges$x) | is.null(ranges$y)){
           plot(imc ,xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),asp="varying")
         }else{
@@ -199,7 +201,7 @@ require(imager)
     }
   
     app.plot.sct <- function(rv){
-      
+      par(bg="transparent")
       if(is.null(ranges$x) | is.null(ranges$y)){
         xli <- c(dim(imc)[2]/2*-1,dim(imc)[2]/2)
         yli <- c(dim(imc)[2],0)
@@ -210,7 +212,7 @@ require(imager)
       
       if(input$tabs=="line"){
        if(is.null(ranges$x) ){
-        par(bg="transparent")
+
         plot(rv$m$y1~rv$m$x1,col=1,pch=3,cex=1.5,
              yaxs="i", xaxs="i",
              xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
@@ -219,7 +221,7 @@ require(imager)
           segments(rv$m$x1,rv$m$y1,rv$m$x2,rv$m$y2)
           #}
         }else{
-        par(bg="transparent")
+
         plot(rv$m$y1~rv$m$x1,col=1,pch=3,cex=1.5, 
              yaxs="i", xaxs="i",
              xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") 
@@ -229,7 +231,7 @@ require(imager)
           #}
         }}
       if(input$tabs=="corr"){
-        par(bg="transparent")
+
 
         if(input$cor_type %in% c("single")){        
           plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
@@ -240,7 +242,7 @@ require(imager)
             plot(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
-            apply(r.multi$m,1,function(x)segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1))
+            apply(r.multi$m,1,function(x){x <- as.numeric(x); segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1)})
             points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,col=4)
         }
         if(input$cor_type %in% c("int")){        
@@ -253,7 +255,7 @@ require(imager)
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
         }
-        if(input$cor_type %in% c("breaks")){
+        if(input$cor_type %in% c("breaks","comments")){
           if(!is.null(r$m)){
           plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
                yaxs="i", xaxs="i",
@@ -271,7 +273,7 @@ require(imager)
             plot(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,
                  yaxs="i", xaxs="i",
                  xlim=xli ,ylim=yli,xlab="",ylab="")
-            apply(r.multi$m,1,function(x)segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1))
+            apply(r.multi$m,1,function(x){x <- as.numeric(x);segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1)})
             points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,col=4)
             if(!is.null(breaks_y$by)){
               if(nrow(breaks_y$by)>0){
@@ -285,7 +287,7 @@ require(imager)
       }      
       if(input$tabs=="score.p"){
 
-          par(bg="transparent")
+
           if(is.null(smooth$res)){gst=0} else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/quantile(smooth$res[,show.band$sb],input$qv)}
    
           if(input$line_type=="sin"){
@@ -326,7 +328,6 @@ require(imager)
           return(NULL)
         }
        
-          par(bg="transparent")
           if(input$line_type!="int"){
             if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/quantile(smooth$res[,show.band$sb],input$qv,na.rm=T)}
             if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
@@ -364,7 +365,6 @@ require(imager)
         }else{pch.v <- 3 ; col.v <- 4}
         
         if(is.null(ranges$x) | is.null(ranges$y)){
-          par(bg="transparent")
           plot(r$m$y~r$m$x,col=col.v,pch=pch.v,cex=1.5,
                yaxs="i", xaxs="i",
                xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
@@ -372,7 +372,6 @@ require(imager)
             points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)
           }
         }else{
-          par(bg="transparent")
           plot(r$m$y~r$m$x,col=col.v,pch=pch.v,cex=1.5, 
                yaxs="i", xaxs="i",
                xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") 
@@ -381,13 +380,25 @@ require(imager)
             }
         }
       }
+       if(input$tabs=="load_data"){
+         if(is.null(r.multi$m)){
+           plot(r$m$y~r$m$x,col=4,pch=3,cex=1.5,
+                yaxs="i", xaxs="i",
+                xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
+         }
+         if(is.null(r$m)){
+           plot(r.multi$m$y~r.multi$m$x,col=4,pch=3,cex=1.5,
+                yaxs="i", xaxs="i",
+                xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
+         }
+         
+       }
+ 
       if(input$tabs=="measure"){
         if(is.null(r)){
           return(NULL)
         }
 
-        par(bg="transparent")
-        
         if(input$save_type %in% c("single","int")){        
           plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
                yaxs="i", xaxs="i",
@@ -680,7 +691,7 @@ require(imager)
     click.count2 <- reactiveValues(cc2 = c(0))
     click.count.break <- reactiveValues(ccb = c(0))
     breaks_y <- reactiveValues(by=NULL)
-    
+    comm.rv <- reactiveValues(c=NULL)
 # plots -------------------------------------------------------------------
     
     output$plot1 <- renderPlot({
@@ -940,6 +951,16 @@ require(imager)
             
           }
         }
+        if(input$cor_type == "comments"){
+          if(is.null(r$m)){
+          np <- nearPoints(r.multi$m, input$plot_click, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
+          comm.rv$c <- np$selected_
+          }
+          if(is.null(r.multi$m)){
+            np <- nearPoints(r$m, input$plot_click, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
+            comm.rv$c <- np$selected_
+          }
+        }
       }
         
       if(input$tabs=="late"){
@@ -996,6 +1017,7 @@ require(imager)
     ## load events ----------------------------------------------------------
     observeEvent(input$load, {
       dat <- read.csv(input$load_file,sep = input$sep)
+      r.multi$m=NULL ; r$m=NULL
       if("slope"%in%colnames(dat)){r.multi$m = dat
       }else{r$m = dat}
     })
@@ -1245,7 +1267,7 @@ require(imager)
           }else{
         res <- r.multi$m
         res <- data.frame(res[order(res$y),])
-        res$distance<- apply(res,1,function(x)sqrt((x[5]-x[7])^2+(x[6]-x[8])^2))
+        res$distance<- apply(res,1,function(x){x <- as.numeric(x);sqrt((x[5]-x[7])^2+(x[6]-x[8])^2)})
         res$year <- input$year-c(1:nrow(res)-1)
         if(!is.null(breaks_y$by)){
           if(is.na(breaks_y$by[nrow(breaks_y$by),2])){showNotification("Please first close the last break", duration = 10, type="error")
@@ -1275,6 +1297,18 @@ require(imager)
       # write.table(res,input$file_dis_ring,row.names=F)
       # }
       })
+    
+    
+    observeEvent(input$add_comment,{
+      if(is.null(r.multi$m)){
+        r$m$comments <- ""
+        r$m$comments[comm.rv$c] <- input$comments
+      }
+      if(is.null(r$m)){
+        r.multi$m$comments <- ""
+        r.multi$m$comments[comm.rv$c] <- input$comments
+      }
+    })
     
     observeEvent(input$dis_late,{
       if(input$save_type=="single" & !is.null(late$l)){
