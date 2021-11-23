@@ -3,14 +3,18 @@ library(imager)
 library(shiny)
 library(keys)
 
-line.measured <- function(imc,rsize.per,name){
+line.measured <- function(imc,name){
 require(imager)
-  
+  rsize.per <- -50
+  dim.img <- dim(imc)[1]*dim(imc)[2]
+  if(dim.img>=1.5e6){
+    val.res <- -1*sqrt(1.5e6/dim.img)*100
+    imc <- resize(imc, val.res, val.res)
+  }
   im <- resize(imc, rsize.per, rsize.per) # x = width; y =heigh
   imc <- flatten.alpha(imc, bg = "white")# solo para png4
   x <- grayscale(imc, method = "Luma", drop = TRUE)
   x <- t(channels(x, drop = T)[[1]])
-  #x <- x[c((nrow(x)-50):nrow(x)),]#para borrar
   qs <- 1
   slider.size <- (min(x)-max(x))*(dim(imc)[1]/2/max(x))
   time.c <- Sys.time()
@@ -144,7 +148,13 @@ require(imager)
                                             "Breaks" = "breaks",
                                             "Comments" = "comments")),
                            textInput("comments", "Comments", value = ""),
-                           actionButton("add_comment", "Add Comment")),
+                           actionButton("add_comment", "Add Comment"),
+                           numericInput(inputId = "year_cor", 
+                                        label = "Final year", 
+                                        value = NA,
+                                        step = 1),
+                           actionButton("add_year", "Add year")
+                           ),
                   tabPanel("Late wood", value="late",
                            actionButton("run_late", "Run"),
                            actionButton("rese_late", "Reset")),
@@ -260,6 +270,13 @@ require(imager)
           plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
                yaxs="i", xaxs="i",
                xlim=xli ,ylim=yli,xlab="",ylab="")
+          
+            if("comments"%in%colnames(r$m)){
+              text(nrow(imc),r$m$y,r$m$comments,pos=4)} 
+            
+            if("year"%in%colnames(r$m)){
+              text(0,r$m$y,r$m$year,pos=2)} 
+            
             if(!is.null(breaks_y$by)){
             if(nrow(breaks_y$by)>0){
                apply(breaks_y$by,1,function(x){
@@ -275,6 +292,13 @@ require(imager)
                  xlim=xli ,ylim=yli,xlab="",ylab="")
             apply(r.multi$m,1,function(x){x <- as.numeric(x);segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1)})
             points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,col=4)
+            
+            if("comments"%in%colnames(r.multi$m)){
+              text(nrow(imc),r.multi$m$y,r.multi$m$comments,pos=4)}
+            
+            if("year"%in%colnames(r.multi$m)){
+              text(0,r.multi$m$y,r.multi$m$year,pos=2)} 
+            
             if(!is.null(breaks_y$by)){
               if(nrow(breaks_y$by)>0){
                 apply(breaks_y$by,1,function(x){
@@ -1161,14 +1185,25 @@ require(imager)
     
     ## correction events ----------------------------------------------------------
     
-     # observeEvent(input$rese, {
-     #   smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,input$qv))
-     #   peak_res <- peaks(smooth_res[,1],input$score,input$join)
-     #   r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0)
-     # })
-    
-    
+    observeEvent(input$add_comment,{
+      if(is.null(r.multi$m)){
+        if(!"comments"%in%colnames(r$m)){r$m$comments <- ""}
+        r$m$comments[comm.rv$c] <- input$comments
+      }
+      if(is.null(r$m)){
+        if(!"comments"%in%colnames(r.multi$m)){r.multi$m$comments <- ""}
+        r.multi$m$comments[comm.rv$c] <- input$comments
+      }
+    })
 
+    observeEvent(input$add_year,{
+      if(is.null(r.multi$m)){
+        r$m$year <- input$year_cor-c(1:nrow(r$m)-1)
+      }
+      if(is.null(r$m)){
+        r.multi$m$year <- input$year_cor-c(1:nrow(r.multi$m)-1)
+      }
+    })
      
     ## late events ----------------------------------------------------------
    
@@ -1297,19 +1332,7 @@ require(imager)
       # write.table(res,input$file_dis_ring,row.names=F)
       # }
       })
-    
-    
-    observeEvent(input$add_comment,{
-      if(is.null(r.multi$m)){
-        r$m$comments <- ""
-        r$m$comments[comm.rv$c] <- input$comments
-      }
-      if(is.null(r$m)){
-        r.multi$m$comments <- ""
-        r.multi$m$comments[comm.rv$c] <- input$comments
-      }
-    })
-    
+
     observeEvent(input$dis_late,{
       if(input$save_type=="single" & !is.null(late$l)){
       colnames(late$l) <- c("xl","yl")
@@ -1346,9 +1369,9 @@ require(imager)
 
 
 ### cargar datos
-imc <- load.image("02-data\\bec_tune.jpeg")
-rsize.per <- -95
+imc <- load.image("02-data\\becacore.png")
 name <- "testigo de prueba"
-line.measured(imc,rsize.per,name)
+line.measured(imc,name)
 
 
+runApp(list(ui = ui, server = server),host="192.168.xxx.xx",port=80, launch.browser = T)
