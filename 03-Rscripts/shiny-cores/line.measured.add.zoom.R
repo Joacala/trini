@@ -3,6 +3,7 @@ library(imager)
 library(shiny)
 library(keys)
 
+
 line.measured <- function(imc,name){
 require(imager)
   rsize.per <- -50
@@ -141,11 +142,12 @@ require(imager)
                            radioButtons(
                              inputId = "cor_type",
                              label = "Correction type",
-                             choices = list("Single" = "single",
-                                            "Interactive" = "int",
+                             choices = list("Interactive" = "int",
                                             "Interactive overlap" = "over",
+                                            "Single" = "single",
                                             "Multi" = "multi",
                                             "Breaks" = "breaks",
+                                            "Demolition" = "demolition",
                                             "Comments" = "comments")),
                            textInput("comments", "Comments", value = ""),
                            actionButton("add_comment", "Add Comment"),
@@ -162,8 +164,8 @@ require(imager)
                            radioButtons(
                              inputId = "save_type",
                              label = "Save type",
-                           choices = list("Single" = "single",
-                                          "Interactive" = "int",
+                           choices = list("Interactive" = "int",
+                                          "Single" = "single",
                                           "Multi" = "multi")),
                            numericInput(inputId = "year", 
                                         label = "Final year", 
@@ -195,17 +197,21 @@ require(imager)
     addKeys("right", "right")
     addKeys("o", "o")
     addKeys("i", "i")
-   #addKeys("undo_key","ctrl+z")
+    addKeys("p", "p")
     
 
 # functions ---------------------------------------------------------------
 
     app.plot.img <- function(imc){
-       if(!is.null(imc)){#input$tabs!="load_data" |
+       if(!is.null(imc)){
         if(is.null(ranges$x) | is.null(ranges$y)){
-          plot(imc ,xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),asp="varying")
+          plot(imc ,xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),asp="varying",axes=F)
+          axis(1)
+          axis(2)
         }else{
-        plot(imc, xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),asp="varying")
+        plot(imc, xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),asp="varying",axes=F)
+          axis(1)
+          axis(2)
         }
        }
     }
@@ -221,58 +227,70 @@ require(imager)
       }
       
       if(input$tabs=="line"){
-       if(is.null(ranges$x) ){
 
-        plot(rv$m$y1~rv$m$x1,col=1,pch=3,cex=1.5,
-             yaxs="i", xaxs="i",
-             xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
-          #if(sf$r==0){
-          points(rv$m$y2~rv$m$x2,pch=3,cex=1.5,col=2)
+        plot(rv$m$y1~rv$m$x1,col=1,pch=3,cex=1.5,lwd=2, 
+             yaxs="i", xaxs="i", axes=F,
+             xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2) 
+          points(rv$m$y2~rv$m$x2,pch=3,cex=1.5,lwd=2,col=2)
           segments(rv$m$x1,rv$m$y1,rv$m$x2,rv$m$y2)
-          #}
-        }else{
-
-        plot(rv$m$y1~rv$m$x1,col=1,pch=3,cex=1.5, 
-             yaxs="i", xaxs="i",
-             xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") 
-          #if(sf$r==0){
-          points(rv$m$y2~rv$m$x2,pch=3,cex=1.5,col=2)
-          segments(rv$m$x1,rv$m$y1,rv$m$x2,rv$m$y2)
-          #}
-        }}
+        }
       if(input$tabs=="corr"){
 
-
         if(input$cor_type %in% c("single")){        
-          plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
-               yaxs="i", xaxs="i",
-               xlim=xli ,ylim=yli,xlab="",ylab="")
+          plot(r$m$y~r$m$x,pch=3,cex=1.5,lwd=2,col=1,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
+          
+          if("year"%in%colnames(r$m)){
+            text(0,r$m$y,r$m$year,pos=2)}
+          if("comments"%in%colnames(r$m)){
+            text(nrow(imc),r$m$y,r$m$comments,pos=4)} 
         }
         if(input$cor_type %in% c("multi")){
-            plot(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,
-               yaxs="i", xaxs="i",
-               xlim=xli ,ylim=yli,xlab="",ylab="")
+            plot(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,lwd=2,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
             apply(r.multi$m,1,function(x){x <- as.numeric(x); segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1)})
-            points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,col=4)
+            points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,lwd=2,col=1)
+            
+            if("comments"%in%colnames(r.multi$m)){
+              text(nrow(imc),r.multi$m$y,r.multi$m$comments,pos=4)}
+            
+            if("year"%in%colnames(r.multi$m)){
+              text(0,r.multi$m$y,r.multi$m$year,pos=2)} 
         }
         if(input$cor_type %in% c("int")){        
-          plot(r$m$y~r$m$x,pch=3,cex=1.5,col=r$m$line,
-               yaxs="i", xaxs="i",
-               xlim=xli ,ylim=yli,xlab="",ylab="")
+          plot(r$m$y~r$m$x,pch=3,cex=1.5,lwd=2,col=r$m$line,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
+          
+          if("year"%in%colnames(r$m)){
+            text(0,r$m$y,r$m$year,pos=2)}
+          if("comments"%in%colnames(r$m)){
+            text(nrow(imc),r$m$y,r$m$comments,pos=4)} 
         }
         if(input$cor_type %in% c("over")){     
-              plot(r$m$y~r$m$x,pch=3,cex=1.5,col=r$m$pair+1,
-               yaxs="i", xaxs="i",
-               xlim=xli ,ylim=yli,xlab="",ylab="")
+              plot(r$m$y~r$m$x,pch=3,cex=1.5,lwd=2,col=r$m$pair+1,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
+          
+          if("year"%in%colnames(r$m)){
+            text(0,r$m$y,r$m$year,pos=2)}
+          if("comments"%in%colnames(r$m)){
+            text(nrow(imc),r$m$y,r$m$comments,pos=4)} 
         }
-        if(input$cor_type %in% c("breaks","comments")){
+        if(input$cor_type %in% c("breaks","comments","demolition")){
           if(!is.null(r$m)){
-          plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
-               yaxs="i", xaxs="i",
-               xlim=xli ,ylim=yli,xlab="",ylab="")
+          plot(r$m$y~r$m$x,pch=3,cex=1.5,lwd=2,col=1,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
           
             if("comments"%in%colnames(r$m)){
-              text(nrow(imc),r$m$y,r$m$comments,pos=4)} 
+              text(nrow(imc),r$m$y,r$m$comments,pos=4)}
+            
+            if(!is.null(demo_y$dy)){
+              segments(x0=0,y0=demo_y$dy[1],x1=dim(imc)[1],y1=demo_y$dy[1],col=2,lwd=3)
+            }
             
             if("year"%in%colnames(r$m)){
               text(0,r$m$y,r$m$year,pos=2)} 
@@ -287,14 +305,18 @@ require(imager)
           }
           
           if(!is.null(r.multi$m)){
-            plot(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,
-                 yaxs="i", xaxs="i",
-                 xlim=xli ,ylim=yli,xlab="",ylab="")
+            plot(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,lwd=2,
+                 yaxs="i", xaxs="i", axes=F,
+                 xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
             apply(r.multi$m,1,function(x){x <- as.numeric(x);segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1)})
-            points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,col=4)
+            points(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,lwd=2,col=1)
             
             if("comments"%in%colnames(r.multi$m)){
               text(nrow(imc),r.multi$m$y,r.multi$m$comments,pos=4)}
+            
+            if(!is.null(demo_y$dy)){
+              segments(x0=0,y0=demo_y$dy[1],x1=dim(imc)[1],y1=demo_y$dy[1],col=2,lwd=3)
+            }
             
             if("year"%in%colnames(r.multi$m)){
               text(0,r.multi$m$y,r.multi$m$year,pos=2)} 
@@ -316,9 +338,9 @@ require(imager)
    
           if(input$line_type=="sin"){
            if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
-               plot(yp~xp,col=4,pch=3,cex=1.5,
-               yaxs="i", xaxs="i",
-               xlim=xli,  ylim = yli,xlab="",ylab="") 
+               plot(yp~xp,col=1,pch=3,cex=1.5,lwd=2,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli,  ylim = yli,xlab="",ylab=""); axis(1);axis(2) 
                lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
                abline(v=input$score)
           }
@@ -326,9 +348,9 @@ require(imager)
         if(input$line_type=="int"){
           if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,input$qv,na.rm=T))}
           if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
-          plot(yp~xp,col=4,pch=3,cex=1.5,
-               yaxs="i", xaxs="i",
-               xlim=xli,  ylim = yli,xlab="",ylab="") 
+          plot(yp~xp,col=1,pch=3,cex=1.5,lwd=2,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli,  ylim = yli,xlab="",ylab=""); axis(1);axis(2) 
           apply(gst,2,function(x)lines(x, 1:length(x),lwd=0.1,col="darkblue"))
           abline(v=input$score)
           }
@@ -336,9 +358,9 @@ require(imager)
         if(input$line_type=="mul"){
           if(is.null(r.multi$m)){yp <- xp <- -1}else{yp <- r.multi$m$y; xp <- r.multi$m$x}
           if(is.null(p$pval)){prob=dim(imc)[1];y=0}else{prob=p$pval$prob*dim(imc)[1]+dim(imc)[1];y<-p$pval$y}
-               plot(yp~xp,col=4,pch=3,cex=1.5,
-               yaxs="i", xaxs="i",
-               xlim=xli,  ylim = yli,xlab="",ylab="") 
+               plot(yp~xp,col=1,pch=3,cex=1.5,lwd=2,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli,  ylim = yli,xlab="",ylab=""); axis(1);axis(2) 
                lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
                abline(v=input$score)
                segments(dim(imc)[1],y,prob,y,lwd=0.1,col=2)
@@ -355,9 +377,9 @@ require(imager)
           if(input$line_type!="int"){
             if(is.null(smooth$res)){gst=0}else{gst <- (smooth$res[,show.band$sb]*(dim(imc)[1]/2))/quantile(smooth$res[,show.band$sb],input$qv,na.rm=T)}
             if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
-            plot(yp~xp,col=4,pch="",cex=1.5,
-               yaxs="i", xaxs="i",
-               xlim=xli,  ylim = yli,xlab="",ylab="") 
+            plot(yp~xp,col=1,pch="",cex=1.5,lwd=2,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli,  ylim = yli,xlab="",ylab=""); axis(1);axis(2) 
             lines(gst, 1:length(gst),lwd=0.1,col="darkblue")
             abline(v=input$band_x1,lwd=0.1,lty=2)
             if(input$line_type=="mul"){abline(v=input$band_xn,lwd=0.1,lty=2)}
@@ -366,9 +388,9 @@ require(imager)
            else{
             if(is.null(smooth.int$res)){gst=0}else{gst <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,input$qv,na.rm=T))}
              if(is.null(r$m)){yp <- xp <- -1}else{yp <- r$m$y; xp <- r$m$x}
-             plot(yp~xp,col=4,pch="",cex=1.5,
-                  yaxs="i", xaxs="i",
-                  xlim=xli,  ylim = yli,xlab="",ylab="")
+             plot(yp~xp,col=1,pch="",cex=1.5,lwd=2,
+                  yaxs="i", xaxs="i", axes=F,
+                  xlim=xli,  ylim = yli,xlab="",ylab=""); axis(1);axis(2)
              apply(gst,2,function(x)lines(x, 1:length(x),lwd=0.1,col="darkblue"))
          }
       }
@@ -389,16 +411,16 @@ require(imager)
         }else{pch.v <- 3 ; col.v <- 4}
         
         if(is.null(ranges$x) | is.null(ranges$y)){
-          plot(r$m$y~r$m$x,col=col.v,pch=pch.v,cex=1.5,
-               yaxs="i", xaxs="i",
-               xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
+          plot(r$m$y~r$m$x,col=col.v,pch=pch.v,cex=1.5,lwd=2,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab=""); axis(1);axis(2)
           if(!is.null(late$l)){
-            points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)
+            points(late$l$y ~ late$l$x, col=2,pch=3,cex=2)
           }
         }else{
           plot(r$m$y~r$m$x,col=col.v,pch=pch.v,cex=1.5, 
-               yaxs="i", xaxs="i",
-               xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab="") 
+               yaxs="i", xaxs="i", axes=F,
+               xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab=""); axis(1);axis(2) 
           if(!is.null(late$l)){
             points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)
             }
@@ -406,15 +428,15 @@ require(imager)
       }
        if(input$tabs=="load_data"){
          if(is.null(r.multi$m)){
-           plot(r$m$y~r$m$x,col=4,pch=3,cex=1.5,
-                yaxs="i", xaxs="i",
-                xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
-         }
+           plot(r$m$y~r$m$x,col=1,pch=3,cex=1.5,lwd=2,
+                yaxs="i", xaxs="i", axes=F,
+                xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
+           }
          if(is.null(r$m)){
-           plot(r.multi$m$y~r.multi$m$x,col=4,pch=3,cex=1.5,
-                yaxs="i", xaxs="i",
-                xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab="")
-         }
+           plot(r.multi$m$y~r.multi$m$x,col=1,pch=3,cex=1.5,lwd=2,
+                yaxs="i", xaxs="i", axes=F,
+                xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
+           }
          
        }
  
@@ -424,16 +446,16 @@ require(imager)
         }
 
         if(input$save_type %in% c("single","int")){        
-          plot(r$m$y~r$m$x,pch=3,cex=1.5,col=4,
-               yaxs="i", xaxs="i",
-               xlim=xli ,ylim=yli,xlab="",ylab="")
+          plot(r$m$y~r$m$x,pch=3,cex=1.5,lwd=2,col=1,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
         }
         if(input$save_type == "multi"){
-          plot(r.multi$m$y~r.multi$m$x,pch="",cex=1.5,
-               yaxs="i", xaxs="i",
-               xlim=xli ,ylim=yli,xlab="",ylab="")
-          apply(r.multi$m,1,function(x)segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=0.05,lty=1,col=1))
-          apply(r.multi$m,1,function(x)segments(x[5],x[6],x[7],x[8],lwd=0.05,lty=1,col=2))
+          plot(r.multi$m$y~r.multi$m$x,pch="",cex=1.5,lwd=2,
+               yaxs="i", xaxs="i", axes=F,
+               xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
+          apply(r.multi$m,1,function(x)segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=1,lty=1,col=1))
+          apply(r.multi$m,1,function(x)segments(x[5],x[6],x[7],x[8],lwd=1,lty=1,col=2))
           
         }
       }
@@ -690,6 +712,19 @@ require(imager)
       ip <- intersection.point(fp)
       data.frame(do.call(rbind,ip))
     }
+    
+    add.year <- function(x){
+      if("year"%in%colnames(x)){
+        pos.sel <- which(is.na(x$year))
+        if(pos.sel>1){
+          pre.year <- x$year[pos.sel-1]
+          x$year[pos.sel:nrow(x)] <- pre.year - (1:(nrow(x)-pos.sel))
+        }else{
+          x$year[pos.sel] <- x$year[pos.sel+1]+1
+        }
+      }
+      x
+      }
 
 # reactive ----------------------------------------------------------------
  
@@ -716,6 +751,9 @@ require(imager)
     click.count.break <- reactiveValues(ccb = c(0))
     breaks_y <- reactiveValues(by=NULL)
     comm.rv <- reactiveValues(c=NULL)
+    click.count.demolition <- reactiveValues(ccd = c(0))
+    demo_y <- reactiveValues(dy=NULL)
+    
 # plots -------------------------------------------------------------------
     
     output$plot1 <- renderPlot({
@@ -728,7 +766,7 @@ require(imager)
     
     output$plot3 <- renderPlot({
       #if(input$tabs!="measure"){
-        plot(im,xlim=c(dim(im)[2]/2*-1,dim(im)[2]/2),ylim=c(dim(im)[2],0),asp="varying")
+        plot(im,xlim=c(dim(im)[2]/2*-1,dim(im)[2]/2),ylim=c(dim(im)[2],0),asp="varying",xaxt='n',yaxt='n', xlab="",ylab="")
         #rect(ranges$x[1]/abs(rsize.per), ranges$y[2]/abs(rsize.per), ranges$x[2]/abs(rsize.per), ranges$y[1]/abs(rsize.per))
       #}
     })
@@ -840,6 +878,11 @@ require(imager)
       }
     })
     
+    observeEvent(input$p,{
+        ranges$x = c(dim(imc)[2]/2*-1, dim(imc)[2]/2)
+        ranges$y = c(0,dim(imc)[2])
+    })
+
     observeEvent(input$plot_click, {
       if(input$tabs=="line"){
       if(sf$r == 0){
@@ -858,6 +901,7 @@ require(imager)
         sf$r <- 0
       }}
       if(input$tabs=="corr"){
+        
         if(input$cor_type == "single"){
           if(length(unique(r$m$line))>1){
           showNotification("Plese select the correct correction type", duration = 10, type="error")
@@ -868,13 +912,14 @@ require(imager)
           r$m[nrow(r$m),3] <- 0
           r$m[nrow(r$m),4] <- 0
           r$m <- r$m[order(r$m$y),]
+          r$m <- add.year(r$m)
           }
         }
         if(input$cor_type == "int"){
           if(num.click.cor$r == 0){
             np <- nearPoints(r$m, input$plot_click, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
             if(sum(np$selected_)==0){
-              showNotification("Please click closer to an existing point", duration = 10, type="error")
+              showNotification("For each point to be added, please first click close-by an existing point", duration = 10, type="error")
             }else{
             r$m[nrow(r$m)+1,4] <- r$m$line[np$selected_]
             num.click.cor$r <- 1
@@ -884,6 +929,7 @@ require(imager)
             r$m[nrow(r$m),2] <- input$plot_click$y
             r$m[nrow(r$m),3] <- 0
             r$m <- r$m[order(r$m$y),]
+            r$m <- add.year(r$m)
             num.click.cor$r <- 0
             click.count$cc <- click.count$cc + 1
           }
@@ -897,7 +943,8 @@ require(imager)
             np <- nearPoints(r$m, input$plot_click, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
             r$m$pair[np$selected_] <-  max(r$m$pair)
             num.click.cor$r <- 0
-          }}
+          }
+          }
         
         if(input$cor_type == "breaks"){
           if(click.count.break$ccb == 0){
@@ -930,6 +977,25 @@ require(imager)
             }
             click.count.break$ccb <- 0
           }}
+        
+        if(input$cor_type == "demolition"){
+          if(click.count.demolition$ccd == 0){
+            demo_y$dy <- c(demo_y$dy,input$plot_click$y)
+            click.count.demolition$ccd <- 1
+          }else{
+            demo_y$dy <- sort(c(demo_y$dy,input$plot_click$y))
+            if(is.null(r$m)){
+              r.multi$m <- r.multi$m[r.multi$m$y < demo_y$dy[1] | r.multi$m$y > demo_y$dy[2],]
+              if("year"%in%colnames(r.multi$m)){r.multi$m$year <- input$year_cor-c(1:nrow(r.multi$m)-1)}
+            }
+            if(is.null(r.multi$m)){
+              r$m <- r$m[r$m$y < demo_y$dy[1] | r$m$y > demo_y$dy[2],]
+              if("year"%in%colnames(r$m)){r$m$year <- input$year_cor-c(1:nrow(r$m)-1)}
+            }
+            demo_y$dy <- NULL
+            click.count.demolition$ccd <- 0
+          } 
+        }
 
         if(input$cor_type == "multi"){
           if(num.click.cor$r == 0){
@@ -972,8 +1038,10 @@ require(imager)
               }
               r.multi$m[i,c(7,8)] <- c(x.inter,y.inter)	
             }
-            
+            r.multi$m <- add.year(r.multi$m)
           }
+          
+          
         }
         if(input$cor_type == "comments"){
           if(is.null(r$m)){
@@ -997,6 +1065,7 @@ require(imager)
           click.count2$cc2 <- click.count2$cc2+1
           np <- nearPoints(r$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
           r$m <- r$m[!np$selected_,] 
+          if("year"%in%colnames(r$m)){r$m$year <- input$year_cor-c(1:nrow(r$m)-1)}
          }
         if(input$cor_type == "multi"){
           click.count2$cc2 <- click.count2$cc2+1
@@ -1015,6 +1084,8 @@ require(imager)
             }
             r.multi$m[i,c(7,8)] <- c(x.inter,y.inter)	
           }
+          if("year"%in%colnames(r.multi$m)){r.multi$m$year <- input$year_cor-c(1:nrow(r.multi$m)-1)}
+          
         }
         if(input$cor_type == "over"){
             np <- nearPoints(r$m, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
@@ -1131,17 +1202,21 @@ require(imager)
       if(ncol(smooth$res)>1){
         showNotification("Plese select the correct detection procedure", duration = 10, type="error")
       }else{
+      if(input$join<1){showNotification("Plese provide Merge values higher than 1", duration = 10, type="error")
+      }else{   
         smooth_res <- smooth$res*(dim(imc)[1]/2/quantile(smooth$res,input$qv,na.rm=T))
         peak_res <- peaks(smooth_res[,1],input$score,input$join)
         r$m <- data.frame(x=input$band_x1, y=peak_res, pair=0, line=0, type=1)
       }
-     }}
+     }}}
     )
     
     observeEvent(input$run_peak_int,{
       if(is.null(smooth.int$res)){
         showNotification("Plese select the correct detection procedure", duration = 10, type="error")
       }else{
+        if(input$join<1){showNotification("Plese provide Merge values higher than 1", duration = 10, type="error")
+          }else{
       smooth_res <- apply(smooth.int$res,2, function(x)x*(dim(imc)[1]/2)/quantile(x,input$qv,na.rm=T))
       peak_res <-apply(smooth_res,2,peaks,input$score,input$join)
       if(!is.list(peak_res)) {peak_res <- list(peak_res)}
@@ -1151,7 +1226,7 @@ require(imager)
       }
       r$m <- data.frame(x=xs, y=unlist(peak_res), pair=0,line=rep(1:length(peak_res),sapply(peak_res,length)), type=1)
       }
-    }
+    }}
     )
 
     observeEvent(input$run_peak_multi,{
@@ -1161,13 +1236,15 @@ require(imager)
       if(ncol(smooth$res)==1){
         showNotification("Plese select the correct detection procedure", duration = 10, type="error")
       }else{
+      if(input$join<1){showNotification("Plese provide Merge values higher than 1", duration = 10, type="error")
+      }else{   
       smooth_res <- apply(smooth$res, 2, function(x){x*(dim(imc)[1]/2/quantile(x,input$qv))})
       peaks.multi <- apply(smooth_res,2,peaks,input$score,input$join)
       c.peak$cp <- clus.peak.bands (peaks.multi, input$join, sel$sel)
       prob <- sapply(c.peak$cp,function(x)length(unique(names(x)))/length(sel$sel))
       y <- sapply(c.peak$cp,mean)
       p$pval <- data.frame(prob=prob,y=y)
-      }}
+      }}}
     })
     
     observeEvent(input$select_multi,{
@@ -1245,11 +1322,13 @@ require(imager)
          if(input$save_type=="int"){showNotification("Please first detect rings using interactive", duration = 10, type="error")}
          }else{
         if(sum(r$m$pair)==0){
-         res <- r$m
-         res <- res[order(res$y),]
-         for(i in 1:(nrow(res)-1)){
-           res[i,"distance"] <- dist(res[c(i,i+1),1:2])
-          }
+          if(length(unique(r$m$line))>1){showNotification("Overlaping rings from different measure lines are not provided", duration = 20, type="warning")}
+              res <- r$m
+              res <- res[order(res$y),]
+              for(i in 1:(nrow(res)-1)){
+                res[i,"distance"] <- dist(res[c(i,i+1),1:2])
+              }
+          
         }else{
           id.line <- unique(r$m$line)
           res.l <- list()
@@ -1374,4 +1453,3 @@ name <- "testigo de prueba"
 line.measured(imc,name)
 
 
-runApp(list(ui = ui, server = server),host="192.168.xxx.xx",port=80, launch.browser = T)
