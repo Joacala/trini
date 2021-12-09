@@ -4,8 +4,8 @@ library(shiny)
 library(keys)
 
 
-line.measured <- function(imc,name){
-require(imager)
+trini <- function(imc,name){
+
   rsize.per <- -50
   dim.img <- dim(imc)[1]*dim(imc)[2]
   if(dim.img>=1.5e6){
@@ -22,7 +22,7 @@ require(imager)
   
   ui <- fluidPage(
     useKeys(),
-    titlePanel(paste("tring... measuring:",name)),
+    titlePanel(paste("trini is measuring:",name)),
     
     
     sidebarLayout(
@@ -157,9 +157,6 @@ require(imager)
                                         step = 1),
                            actionButton("add_year", "Add year")
                            ),
-                  tabPanel("Late wood", value="late",
-                           actionButton("run_late", "Run"),
-                           actionButton("rese_late", "Reset")),
                   tabPanel("Measures", value="measure",
                            radioButtons(
                              inputId = "save_type",
@@ -176,9 +173,7 @@ require(imager)
                                         value = NA,
                                         step = 1),
                            textInput("file_dis_ring", "Compute and save distances between rings", value = paste(name,"distance_ring.csv")),
-                           actionButton("dis_ring", "Run & save"),
-                           textInput("file_dis_late", "Compute and save distances between ring parts", value = "distance_parts.csv"),
-                           actionButton("dis_late", "Run & save")),
+                           actionButton("dis_ring", "Run & save")),
                   tabPanel("Load data",value="load_data",
                            textInput("load_file", "Load ring data", value = "name.csv"),
                            textInput("sep", "Separator", value = ";"),
@@ -191,6 +186,7 @@ require(imager)
 
   server <- function(input, output) {
     
+    #options(shiny.sanitize.errors = TRUE)
     addKeys("down", "down")
     addKeys("up", "up")
     addKeys("left", "left")
@@ -217,6 +213,7 @@ require(imager)
     }
   
     app.plot.sct <- function(rv){
+      tryCatch({
       par(bg="transparent")
       if(is.null(ranges$x) | is.null(ranges$y)){
         xli <- c(dim(imc)[2]/2*-1,dim(imc)[2]/2)
@@ -233,7 +230,8 @@ require(imager)
              xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2) 
           points(rv$m$y2~rv$m$x2,pch=3,cex=1.5,lwd=2,col=2)
           segments(rv$m$x1,rv$m$y1,rv$m$x2,rv$m$y2)
-        }
+      }
+      
       if(input$tabs=="corr"){
 
         if(input$cor_type %in% c("single")){        
@@ -246,6 +244,7 @@ require(imager)
           if("comments"%in%colnames(r$m)){
             text(nrow(imc),r$m$y,r$m$comments,pos=4)} 
         }
+        
         if(input$cor_type %in% c("multi")){
             plot(r.multi$m$y~r.multi$m$x,pch=3,cex=1.5,lwd=2,
                yaxs="i", xaxs="i", axes=F,
@@ -394,38 +393,6 @@ require(imager)
              apply(gst,2,function(x)lines(x, 1:length(x),lwd=0.1,col="darkblue"))
          }
       }
-      if(input$tabs=="late"){ 
-        if(is.null(r)){
-          return(NULL)
-        }
-        
-        if(!is.null(late$l)){
-          pch.v <- c()
-          col.v <- c()
-          for(i in 1:(nrow(r$m)-1)){
-            if(sum(late$l$y>=r$m$y[i] & late$l$y<=r$m$y[i+1])!=1){
-              pch.v[i] <- 19
-              col.v[i] <- 1
-            }else{pch.v[i] <- 3 ; col.v[i] <- 4}
-          }
-        }else{pch.v <- 3 ; col.v <- 4}
-        
-        if(is.null(ranges$x) | is.null(ranges$y)){
-          plot(r$m$y~r$m$x,col=col.v,pch=pch.v,cex=1.5,lwd=2,
-               yaxs="i", xaxs="i", axes=F,
-               xlim=c(dim(imc)[2]/2*-1,dim(imc)[2]/2),ylim=c(dim(imc)[2],0),xlab="",ylab=""); axis(1);axis(2)
-          if(!is.null(late$l)){
-            points(late$l$y ~ late$l$x, col=2,pch=3,cex=2)
-          }
-        }else{
-          plot(r$m$y~r$m$x,col=col.v,pch=pch.v,cex=1.5, 
-               yaxs="i", xaxs="i", axes=F,
-               xlim=ranges$x,  ylim = c(ranges$y[2], ranges$y[1]),xlab="",ylab=""); axis(1);axis(2) 
-          if(!is.null(late$l)){
-            points(late$l$y ~ late$l$x, col=2,pch=3,cex=1.5)
-            }
-        }
-      }
        if(input$tabs=="load_data"){
          if(is.null(r.multi$m)){
            plot(r$m$y~r$m$x,col=1,pch=3,cex=1.5,lwd=2,
@@ -454,12 +421,13 @@ require(imager)
           plot(r.multi$m$y~r.multi$m$x,pch="",cex=1.5,lwd=2,
                yaxs="i", xaxs="i", axes=F,
                xlim=xli ,ylim=yli,xlab="",ylab=""); axis(1);axis(2)
-          apply(r.multi$m,1,function(x)segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=1,lty=1,col=1))
-          apply(r.multi$m,1,function(x)segments(x[5],x[6],x[7],x[8],lwd=1,lty=1,col=2))
+          apply(r.multi$m,1,function(x){x <- as.numeric(x);segments(x[9],x[1]+x[2]*x[9],x[10],x[1]+x[2]*x[10],lwd=2,lty=1,col=1)})
+          apply(r.multi$m,1,function(x){x <- as.numeric(x);segments(x[5],x[6],x[7],x[8],lwd=2,lty=1,col=2)})
           
         }
       }
-    }
+      }, error=function(x){""})}
+      
     band.sel <- function(band, band.end=NA, Nband=NA){
       # OJO: si band.end - band < Nband. Dar aviso
       sel <- round(seq(band,band.end,length=Nband))
@@ -545,21 +513,17 @@ require(imager)
       
         if(yf>nrow(x)){yf = nrow(x)}
         if(y0<1){y0 = 1}
-      
-        # #gaussian weighs
-        # th <- abs(0:(lums*2)-lums)
-        # tv <- 0:lum
-        # dis.up <- decay.gaus.2d(alpha, th, tv)
-        # 
-        # th <- abs(0:(ldms*2)-ldms)
-        # tv <- 0:ldm
-        # dis.dwon <- decay.gaus.2d(alpha, th, tv)
-        
+
         xs <- c()
         diff <- c()
         for(j in y0:yf){
-          xj <- xs[j] <- (-line[5] + j)/line[6]
-         
+          
+          if(line[1]==line[3]){ # if line is perfectly vertical
+            xj <- xs[j] <- line[1]
+          }else{
+            xj <- xs[j] <- (-line[5] + j)/line[6]
+          }
+          
           if(xj<1 | xj>ncol(x)){diff[j] <- xs[j] <- NA}else{
             if( j-lum <1){up = j-1}else{up = lum}
             if( xj-lums <1){ul = xj-1}else{ul = lums}
@@ -595,23 +559,7 @@ require(imager)
       res <- res[-v]
     }
 
-    late.f <- function(x,res){# OJO: los puntos corregidos los pone a la altura
-      res.o <-res[order(res$y),] 
-      res.y <- res.o$y
-        
-      res.end.y <- c()
-        for(i in 1:(length(res.y)-1)){
-          id.max <- which.max(x[res.y[i]:res.y[i+1]])
-          res.end.y[i] <- c(res.y[i]:res.y[i+1])[id.max]
-
-        }
-        id.max <- which.max(x[res.y[length(res.y)]:length(x)])
-        res.end.y[length(res.y)] <-c(res.y[length(res.y)]:length(x))[id.max]
-        res.end <- data.frame(x=res.o$x,y=res.end.y)
-        res.end
-    }
-    
-    clus.peak.bands <- function(x, join.dis, sel){
+     clus.peak.bands <- function(x, join.dis, sel){
       
       # x : list of peaks of each band 
       # join.dis: cluster peaks from different bands at <=join.dis height (pixels)
@@ -736,7 +684,6 @@ require(imager)
     ranges = reactiveValues(x = NULL, y = NULL)
     smooth = reactiveValues(res = NULL)
     peak = reactiveValues(res = NULL)
-    late = reactiveValues(l=NULL)
     show.band = reactiveValues(sb=1)
     c.peak = reactiveValues(cp=NULL)
     p = reactiveValues(pval=NULL)
@@ -745,7 +692,6 @@ require(imager)
     smooth.int = reactiveValues(res = NULL)
     smooth.int.x = reactiveValues(res = NULL)
     over = reactiveValues(m = NULL)
-    # time = reactiveValues(t = c())
     click.count <- reactiveValues(cc = c(0))
     click.count2 <- reactiveValues(cc2 = c(0))
     click.count.break <- reactiveValues(ccb = c(0))
@@ -765,10 +711,7 @@ require(imager)
     })
     
     output$plot3 <- renderPlot({
-      #if(input$tabs!="measure"){
         plot(im,xlim=c(dim(im)[2]/2*-1,dim(im)[2]/2),ylim=c(dim(im)[2],0),asp="varying",xaxt='n',yaxt='n', xlab="",ylab="")
-        #rect(ranges$x[1]/abs(rsize.per), ranges$y[2]/abs(rsize.per), ranges$x[2]/abs(rsize.per), ranges$y[1]/abs(rsize.per))
-      #}
     })
     
     
@@ -895,8 +838,7 @@ require(imager)
         #intercepto
         rv$m[nrow(rv$m),5] <- rv$m[nrow(rv$m),2] - m * rv$m[nrow(rv$m),1] 
         rv$m[nrow(rv$m),6] <- m
-        #OJO: esto es una guarrada
-        if(rv$m[nrow(rv$m),1]==rv$m[nrow(rv$m),3]){rv$m[nrow(rv$m),6] <- 1;rv$m[nrow(rv$m),5] <-0 }
+      if(rv$m[nrow(rv$m),1]==rv$m[nrow(rv$m),3]){rv$m[nrow(rv$m),6] <- 1;rv$m[nrow(rv$m),5] <-0 }
         rv$m <- rv$m[!is.na(rowSums(rv$m)),]
         sf$r <- 0
       }}
@@ -937,12 +879,23 @@ require(imager)
         if(input$cor_type == "over"){
           if(num.click.cor$r == 0){
             np <- nearPoints(r$m, input$plot_click, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
-            r$m$pair[np$selected_] <-  max(r$m$pair)+1
-            num.click.cor$r <- 1
+            if(sum(np$selected_)==0){
+              showNotification("Please click close-by an existing point", duration = 10, type="error")
+            }else{
+              r$m$pair[np$selected_] <-  max(r$m$pair)+1
+              num.click.cor$r <- 1
+            }
           }else{
             np <- nearPoints(r$m, input$plot_click, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
-            r$m$pair[np$selected_] <-  max(r$m$pair)
-            num.click.cor$r <- 0
+            if(sum(np$selected_)==0){
+              showNotification("Please click close-by an existing point", duration = 10, type="error")
+            }else{
+              if(r$m$line[np$selected_]==r$m$line[which.max(r$m$pair)]){showNotification("Please click close-by an existing point of a different measure line", duration = 10, type="error")
+                }else{
+                  r$m$pair[np$selected_] <-  max(r$m$pair)
+                  num.click.cor$r <- 0
+                }
+            }
           }
           }
         
@@ -1054,10 +1007,7 @@ require(imager)
           }
         }
       }
-        
-      if(input$tabs=="late"){
-        late$l <- rbind(late$l,unlist(input$plot_click))
-      }})
+      })
 
     observeEvent(input$plot_click2, {
       if(input$tabs=="corr"){
@@ -1102,10 +1052,6 @@ require(imager)
             yc <= x[2]})
           breaks_y$by <-   breaks_y$by[!sel,]
          }}}}
-      }
-      if(input$tabs=="late"){
-        np <- nearPoints(late$l, input$plot_click2, xvar = "x", yvar = "y", allRows = TRUE, maxpoints=1)
-        late$l <- late$l[!np$selected_,]
       }
     })
     
@@ -1282,35 +1228,6 @@ require(imager)
       }
     })
      
-    ## late events ----------------------------------------------------------
-   
-    
-    observeEvent(input$run_late,{  # sino funciona el por el r$m$pair y line
-      if(is.null(smooth$res)){
-        showNotification("Please first detect rings using single", duration = 10, type="error")
-      }else{
-        if(ncol(smooth$res)>1){
-          showNotification("Please first detect rings using single", duration = 10, type="error")
-         }else{
-          late$l <- late.f (smooth$res, r$m)
-        }
-        
-      }
-    }
-    )
-    
-    observeEvent(input$rese_late, {
-      if(is.null(smooth$res)){
-        showNotification("Please first detect rings using single", duration = 10, type="error")
-      }else{
-        if(ncol(smooth$res)>1){
-          showNotification("Please first detect rings using single", duration = 10, type="error")
-        }else{
-          late$l <- late.f (smooth$res, r$m)
-        }
-      }
-    })
-    
     ## measures events ----------------------------------------------------------
     
     observeEvent(input$dis_ring,{
@@ -1411,35 +1328,6 @@ require(imager)
       # write.table(res,input$file_dis_ring,row.names=F)
       # }
       })
-
-    observeEvent(input$dis_late,{
-      if(input$save_type=="single" & !is.null(late$l)){
-      colnames(late$l) <- c("xl","yl")
-      res <- data.frame(cbind(r$m,late$l))
-      res <- res[order(res$y),]
-      for(i in 1:(nrow(res)-1)){
-        res$ring[i] <- dist(res[c(i,i+1),c("x","y")])
-        late.i <- res[i,c("xl","yl")]; colnames(late.i)<- c("x","y")
-        early.i <- res[i+1,c("x","y")]; colnames(early.i)<- c("x","y")
-        res$early[i] <- dist(rbind(late.i,early.i))
-      }
-      res$late <- apply(res,1,function(x)dist(rbind(x[c("x","y")],x[c("xl","yl")])))
-      res$year <- input$year-c(1:nrow(res)-1)
-      
-      res[,"ring(cm)"] <- (res$ring/input$ppp)*2.54
-      res[,"early(cm)"] <- (res$early/input$ppp)*2.54
-      res[,"late(cm)"] <- (res$late/input$ppp)*2.54
-
-      write.table(res,file=file.path("04-results",input$file_dis_late),row.names=F)
-      }else{showNotification("Sorry only implemented for single type", duration = 10, type="error")}
-      
-    }
-    )
-    
-    # observeEvent(input$start_time,{time$t <- Sys.time()})
-
-    
-    
   }
 
   shinyApp(ui, server)
@@ -1450,6 +1338,6 @@ require(imager)
 ### cargar datos
 imc <- load.image("02-data\\becacore.png")
 name <- "testigo de prueba"
-line.measured(imc,name)
+trini(imc,name)
 
 
