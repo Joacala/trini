@@ -1057,10 +1057,21 @@ trini <- function(imc,name){
     
     ## load events ----------------------------------------------------------
     observeEvent(input$load, {
-      dat <- read.csv(input$load_file,sep = input$sep)
-      r.multi$m=NULL ; r$m=NULL
-      if("slope"%in%colnames(dat)){r.multi$m = dat
-      }else{r$m = dat}
+      dat <- tryCatch( expr = {
+        read.csv(input$load_file,sep = input$sep)
+      },
+      error = function(e){showNotification("The file does not exist", duration = 10, type="error")
+        NULL
+        })
+      if(!is.null(dat)){
+        if(ncol(dat)<5){
+          showNotification("Please verify the separator is correct", duration = 10, type="error")
+        }else{
+          r.multi$m=NULL ; r$m=NULL; breaks_y$by=NULL
+          if("slope"%in%colnames(dat)){r.multi$m = dat
+          }else{r$m = dat}
+        }
+      }
     })
     
     ## lines events ----------------------------------------------------------
@@ -1339,5 +1350,6 @@ trini <- function(imc,name){
 imc <- load.image("02-data\\becacore.png")
 name <- "testigo de prueba"
 trini(imc,name)
+
 
 
