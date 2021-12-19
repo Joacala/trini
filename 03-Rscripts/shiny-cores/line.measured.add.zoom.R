@@ -720,10 +720,10 @@ trini <- function(imc,name){
     ## plot management ----------------------------------------------------------
     
     observeEvent(input$plot3_brush, {
-      if(input$tabs!="load_data"){
+      #if(input$tabs!="load_data"){
         ranges$x <- c(input$plot3_brush$xmin * 100/abs(rsize.per), input$plot3_brush$xmax * 100/abs(rsize.per))
         ranges$y <- c(input$plot3_brush$ymin * 100/abs(rsize.per), input$plot3_brush$ymax * 100/abs(rsize.per))
-      }
+      #}
     })
     
     observeEvent(input$plot1_brush, {
@@ -1220,13 +1220,17 @@ trini <- function(imc,name){
     ## correction events ----------------------------------------------------------
     
     observeEvent(input$add_comment,{
-      if(is.null(r.multi$m)){
-        if(!"comments"%in%colnames(r$m)){r$m$comments <- ""}
-        r$m$comments[comm.rv$c] <- input$comments
-      }
-      if(is.null(r$m)){
-        if(!"comments"%in%colnames(r.multi$m)){r.multi$m$comments <- ""}
-        r.multi$m$comments[comm.rv$c] <- input$comments
+      if(input$cor_type != "comments"){showNotification("Please first select comments button", duration = 10, type="error")
+        }else{
+        
+        if(is.null(r.multi$m)){
+          if(!"comments"%in%colnames(r$m)){r$m$comments <- ""}
+          r$m$comments[comm.rv$c] <- input$comments
+        }
+        if(is.null(r$m)){
+          if(!"comments"%in%colnames(r.multi$m)){r.multi$m$comments <- ""}
+          r.multi$m$comments[comm.rv$c] <- input$comments
+        }
       }
     })
 
@@ -1295,11 +1299,11 @@ trini <- function(imc,name){
             }
             
             res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
-            write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
+            write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F,sep=";")
            }
          }else{            
               res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
-               write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
+               write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F,sep=";")
          }
          
          }
@@ -1322,14 +1326,14 @@ trini <- function(imc,name){
             }
             
             res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
-            write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
+            write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F,sep=";")
           }
         }else{            
           res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
-          write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
+          write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F,sep=";")
         }
         res[,"distance(cm)"] <- (res$distance/input$ppp)*2.54
-        write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F)
+        write.table(res,file=file.path("04-results",input$file_dis_ring),row.names=F,sep=";")
       }}
       # if(is.null(r.multi$m) & is.null(r$m)){
       #   showNotification("Please first detect rings", duration = 10, type="error")
