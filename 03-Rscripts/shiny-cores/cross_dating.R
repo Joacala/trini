@@ -36,6 +36,9 @@ ui <- (fluidPage(
         label = "Select core",
         choices = list("1" = "1",
                        "2" = "2")),
+      tableOutput(
+        outputId = "correl.out"
+        ),
       actionButton("mean", "Mean"),
       textInput("name", "Name master", value = "name.csv"),
       actionButton("save", "Save master")
@@ -159,6 +162,17 @@ server <- function(input, output) {
   })
   observeEvent(input$save, {
     write.csv(mean.data$m, input$name, row.names=F)
+  })
+  
+  output$correl.out <- renderTable({
+    req(input$load_1, input$load_2)
+    cor1 <- ring.data.1$m$distance[ring.data.1$m$year %in% ring.data.2$m$year]
+    cor2 <- ring.data.2$m$distance[ring.data.2$m$year %in% ring.data.1$m$year]
+    if (length(cor1) != length(cor2)){
+      validate("Different number of years in each core")
+    }else{
+    data.frame(Correlation = cor(cor1, cor2, use = "complete.obs"))
+    }
   })
   
   observeEvent(input$up,{
