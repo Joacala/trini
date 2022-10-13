@@ -3,7 +3,6 @@ library(imager)
 library(shiny)
 library(keys)
 
-
 trini <- function(imc,name){
 
   rsize.per <- -50
